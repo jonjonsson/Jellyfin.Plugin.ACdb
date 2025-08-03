@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <IsPublishable>True</IsPublishable>
+        <ErrorReport>none</ErrorReport>
+        <AssemblyVersion>2.2.0.0</AssemblyVersion>
+        <FileVersion>2.2.0.0</FileVersion>
+        <AssemblyInformationalVersion>4.8.0.0</AssemblyInformationalVersion>
+        <ProductVersion>4.8.0.0</ProductVersion>
+        <Platforms>AnyCPU</Platforms>
+        <Configurations>
+			Release;Debug
+		</Configurations>
+    </PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)'=='Debug'">
+		<DebugType>full</DebugType>
+		<DebugSymbols>true</DebugSymbols>
+	</PropertyGroup>
+
+
+	<PropertyGroup Condition="'$(Configuration)'=='Debug'">
+		<DefineConstants>$(DefineConstants);DEBUG;TRACE;JELLYFIN</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<Optimize>True</Optimize>
+		<NoWarn>1701;1702;IDE0305;IDE0290;IDE0031;CA1854;SYSLIB1045;IDE0057;IDE0270;CA1822;CA1850</NoWarn>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<NoWarn>1701;1702;IDE0305;IDE0290;IDE0031;CA1854;SYSLIB1045;IDE0057;IDE0270;CA1822;CA1850</NoWarn>
+	</PropertyGroup>
+	
+    <ItemGroup>
+        <PackageReference Include="Jellyfin.Controller" Version="10.10.7" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+        <PackageReference Include="Jellyfin.Model" Version="10.10.7" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+    </ItemGroup>
+	
+    <ItemGroup>
+        <Compile Update="Properties\Resources.Designer.cs">
+            <DesignTime>True</DesignTime>
+            <AutoGen>True</AutoGen>
+            <DependentUpon>Resources.resx</DependentUpon>
+        </Compile>
+    </ItemGroup>
+	
+    <ItemGroup>
+        <EmbeddedResource Update="Properties\Resources.resx">
+            <Generator>ResXFileCodeGenerator</Generator>
+            <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+    </ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Configuration\configPage.html" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+	</ItemGroup>
+
+
+	<PropertyGroup Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'">
+		<AssemblyName>Jellyfin.Plugin.ACdb</AssemblyName>
+	</PropertyGroup>
+
+</Project>

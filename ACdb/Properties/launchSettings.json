@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "Emby": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Users\\jonjo\\AppData\\Roaming\\Emby-Server\\system\\EmbyServer.exe",
+      "commandLineArgs": "-nointerface",
+      "workingDirectory": "C:\\Users\\jonjo\\AppData\\Roaming\\Emby-Server\\system"
+    },
+    "Jellyfin": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Users\\jonjo\\source\\repos\\KontentCommander\\server-installs\\jellyfin\\jellyfin_10.10.7\\jellyfin.exe",
+      "workingDirectory": "C:\\Users\\jonjo\\source\\repos\\KontentCommander\\server-installs\\jellyfin\\jellyfin_10.10.7"
+    }
+  }
+}

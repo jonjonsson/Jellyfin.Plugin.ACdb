@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ACdb.tv</title>
+   
+</head>
+    <body>
+
+        <div id="ConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox,serverInfo,paperList">
+
+            <!-- Syles must be within this div or they will not load -->
+            <style>
+                .pluginInfo {
+                    display: -webkit-flex;
+                    display: flex;
+                    -webkit-flex-wrap: wrap;
+                    flex-wrap: wrap;
+                    gap: 1em;
+                    padding: 1em
+                }
+
+                .pluginInfo-label {
+                    -webkit-flex: 1 0 20%;
+                    flex: 1 0 20%;
+                    font-weight: 700;
+                    min-width: 7.5em
+                }
+
+                .pluginInfo-value {
+                    -webkit-flex: 1 0 70%;
+                    flex: 1 0 70%
+                }
+
+                .carousel-container {
+                    position: relative;
+                    overflow: hidden;
+                    width: 100%;
+                    max-height: 225px;
+                    margin: 1em auto;
+                }
+
+                .carousel-track {
+                    display: flex;
+                    overflow-x: auto;
+                    scroll-behavior: smooth;
+                    height: 100%;
+                    gap: 0;
+                }
+
+                .carousel-slide {
+                    flex: 0 0 auto;
+                    height: 225px;
+                    width: 150px; 
+                    margin: 0px 10px 0px 0px;
+                    padding: 0;
+                }
+
+                    .carousel-slide img {
+                        height: 100%;
+                        width: 100%;
+                        object-fit: cover;
+                        display: block;
+                        margin: 0;
+                        padding: 0;
+                        border-radius: 4px;
+                    }
+
+                    .carousel-slide a {
+                        height: 225px;
+                        width: 150px;
+                        margin: 0px;
+                        padding: 0px;
+                    }
+
+                .carousel-button {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: rgba(0,0,0,0.6);
+                    border: none;
+                    color: white;
+                    font-size: 2rem;
+                    padding: 3px 12px 6px 12px;
+                    cursor: pointer;
+                    z-index: 2;
+                    user-select: none;
+                    font-weight: bold;
+                }
+
+                    .carousel-button.next {
+                        right: 10px;
+                    }
+
+                    .carousel-button.prev {
+                        left: 10px;
+                    }
+            </style>
+
+            <div data-role="content">
+                <div class="content-primary">
+
+                    <h1>ACdb.tv</h1>
+                    <h3 style="margin-block-end:0em">Random sample of collections from ACdb.tv</h3>
+                     
+                    <form class="configForm">
+
+                        <div id="carousel-placeholder">
+
+                            <div class="carousel-container">
+                                <button id="prev-slide" class="carousel-button prev" type="button">‹</button>
+                                <div class="carousel-track" id="carouselTrack">
+                                    <!-- Slides will be injected here -->
+                                </div>
+                                <button id="next-slide" class="carousel-button next" type="button">›</button>
+                            </div>
+
+                            <script>
+                                const track = document.getElementById('carouselTrack');
+                                const nextBtn = document.querySelector('.carousel-button.next');
+                                const prevBtn = document.querySelector('.carousel-button.prev');
+
+                                let scrollAmount = 0;
+
+                                function updateScrollAmount() {
+                                    scrollAmount = document.querySelector('.carousel-container').offsetWidth;
+                                }
+
+                                function scrollCarouselNext() {
+                                    const maxScroll = track.scrollWidth - track.clientWidth;
+                                    track.scrollLeft += scrollAmount / 1.2;
+                                    if (track.scrollLeft >= maxScroll - 1) {
+                                        track.scrollLeft = 0;
+                                    }
+                                }
+
+                                function scrollCarouselPrev() {
+                                    track.scrollLeft -= scrollAmount / 1.2;
+                                    if (track.scrollLeft <= 0) {
+                                        track.scrollLeft = track.scrollWidth - track.clientWidth;
+                                    }
+                                }
+
+                                nextBtn.addEventListener('click', scrollCarouselNext);
+                                prevBtn.addEventListener('click', scrollCarouselPrev);
+                                window.addEventListener('resize', updateScrollAmount);
+
+                                updateScrollAmount();
+
+                                function renderCarouselSlides(posters) {
+                                    track.innerHTML = '';
+                                    posters.forEach(function(poster, idx) {
+                                        const slide = document.createElement('div');
+                                        slide.className = 'carousel-slide';
+                                        const link = document.createElement('a');
+                                        link.href = '#';
+                                        link.target = '_blank';
+                                        link.setAttribute('rel', 'noopener');
+                                        link.setAttribute('is', 'emby-linkbutton');
+                                        link.addEventListener('click', function(e) {
+                                            e.preventDefault();
+                                            handleButtonClick('WebUrlWithTokenButton', poster.collection_url);
+                                        });
+                                        const img = document.createElement('img');
+                                        img.src = poster.image_url;
+                                        link.appendChild(img);
+                                        slide.appendChild(link);
+                                        track.appendChild(slide);
+                                    });
+                                }
+
+                                function fetchCarouselSlides() {
+                                    ApiClient.ajax({
+                                        type: "GET",
+                                        url: ApiClient.getUrl("Plugins/ACdb/GetPosterGrid"),
+                                        dataType: "json"
+                                    }).then(function (result) {
+                                        let posters = [];
+                                        try {
+                                            const data = typeof result.json === 'string' ? JSON.parse(result.json) : result.json;
+                                            posters = data.posters || [];
+                                        } catch (e) {
+                                            posters = [];
+                                        }
+                                        if (posters.length) {
+                                            renderCarouselSlides(posters);
+                                        }
+                                    });
+                                }
+
+                                fetchCarouselSlides();
+                            </script>
+
+                        </div>
+
+
+
+
+                        <!---------------------------------------------------------------->
+                        <!-------------------------- LOGGED OUT -------------------------->
+                        <!---------------------------------------------------------------->
+                        <div data-state="loggedOut" class="inputContainer">
+                            <div class="inputContainer">
+                                <a href="https://acdb.tv?source=plugin&loggedin=false" target="_blank" rel="noopener" is="emby-linkbutton" class="raised block emby-button">
+                                    <span>Learn About ACdb.tv</span>
+                                </a>
+                            </div>
+                            <h3>Create a user with one click or log in</h3>
+                            <div class="inputContainer">
+                                <button id="CreateUserButton" is="emby-button" type="button" class="raised button-alt emby-button">
+                                    <span>Create User</span>
+                                </button>
+                                <button id="ShowLogInButton" is="emby-button" type="button" class="raised button-alt emby-button"
+                                        onclick="var s=document.getElementById('loginSection');s.style.display=s.style.display==='block'?'none':'block';">
+                                    <span>Log In</span>
+                                </button>
+                            </div>
+                            <div id="loginSection" style="display:none;" class="inputContainer">
+                                <div>
+                                    <label class="inputLabel inputLabelUnfocused" for="PluginSecret">Plugin Secret From <a href="https://acdb.tv" target="_blank" rel="noopener">ACdb.tv</a></label>
+                                    <input id="PluginSecret" name="PluginSecret" is="emby-input" placeholder="Paste in Plugin Secret from ACdb.tv" />
+                                </div>
+                                <div>
+                                    <button id="LoginButton" is="emby-button" type="button" class="raised button-submit block emby-button">
+                                        <span>Log In</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!--------------------------------------------------------------->
+                        <!-------------------------- LOGGED IN -------------------------->
+                        <!--------------------------------------------------------------->
+                        <div data-state="loggedIn" style="display:none;">
+
+                            <div class="inputContainer">
+                                <button id="WebWithTokenButton" is="emby-button" type="button" class="raised block button-alt emby-button">
+                                    <span>See All Collections on ACdb.tv</span>
+                                </button>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label for="LoggedInPluginSecret" class="inputLabel inputLabelUnfocused">Your Plugin Secret</label>
+                                <input id="LoggedInPluginSecret" type="text" readonly style="width:100%; min-width:0;" is="emby-input" />
+                                <div class="fieldDescription">You can use your Plugin Secret Key to log into <a href="http://acdb.tv" target="_blank" rel="noopener">ACdb.tv</a></div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <button id="WebAccountWithTokenButton" is="emby-button" type="button" class="raised button-alt emby-button">
+                                    <span>Upgrade / Manage Account</span>
+                                </button>
+                                <button id="LogoutButton" is="emby-button" type="button" class="raised button-alt emby-button">
+                                    <span>Log Out</span>
+                                </button>
+                            </div>
+
+                            <div class="pluginInfo paperList inputContainer">
+                                <div class="pluginInfo-label">Last Synced</div>
+                                <div class="pluginInfo-value" id="lastSynced"></div>
+                                <div class="pluginInfo-label">Next Sync</div>
+                                <div class="pluginInfo-value" id="nextSync"></div>
+                                <div class="pluginInfo-label">Plugin Version</div>
+                                <div class="pluginInfo-value" id="pluginVersion"></div>
+                            </div>
+
+                            <br />
+                            <div class="inputContainer">
+                                <button id="SyncNowButton" is="emby-button" class="raised button-submit block emby-button"><span>Synchronize Now</span></button>
+                            </div>
+
+                        </div>
+
+                        <!---------------------------------------------------------------->
+                        <!-------------------------- ALL STATES -------------------------->
+                        <!---------------------------------------------------------------->
+                        <div id="errorContainer" style="display:none; color:red; margin-top:20px;" class="inputContainer">
+                            <strong>Errors:</strong>
+                            <ul id="errorList" style="margin:0; padding-left:20px;"></ul>
+                        </div>
+
+                        <!-- Hidden link that is used by buttons to log in with token -->
+                        <a id="GoToUrl" style="display: none;" href="https://acdb.tv?source=plugin&loggedin=false" target="_blank" rel="noopener" is="emby-linkbutton">
+                            <span>Hidden link</span>
+                        </a>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+
+            <script type="text/javascript">
+                let currentState = 'loggedOut';
+
+                function updateUI() {
+                    document.querySelectorAll('[data-state]').forEach(function (el) {
+                        el.style.display = (el.getAttribute('data-state') === currentState) ? 'block' : 'none';
+                    });
+                    if (currentState === 'loggedOut') {
+                        var pluginSecretInput = document.getElementById('PluginSecret');
+                        if (pluginSecretInput) pluginSecretInput.value = '';
+                    }
+                    if (currentState === 'loggedIn') {
+                        // Fetch and display the PluginSecret in the loggedIn input
+                        ApiClient.ajax({
+                            type: "GET",
+                            url: ApiClient.getUrl("Plugins/ACdb/GetPluginSecret"),
+                            dataType: "json"
+                        }).then(function (result) {
+                            var loggedInSecret = document.getElementById('LoggedInPluginSecret');
+                            if (loggedInSecret) loggedInSecret.value = result.pluginSecret || '';
+                        });
+                    }
+                    updatePluginInfo();
+                }
+
+                function updatePluginInfo() {
+                    ApiClient.ajax({
+                        type: "GET",
+                        url: ApiClient.getUrl("Plugins/ACdb/GetPluginInfo"),
+                        dataType: "json"
+                    }).then(function (result) {
+                        document.getElementById('lastSynced').textContent = result.lastSynced || '';
+                        document.getElementById('nextSync').textContent = result.nextSync || '';
+                        document.getElementById('pluginVersion').textContent = result.pluginVersion || '';
+                    });
+                }
+
+                function fetchCurrentState() {
+                    ApiClient.ajax({
+                        type: "GET",
+                        url: ApiClient.getUrl("Plugins/ACdb/GetCurrentState"),
+                        dataType: "json"
+                    }).then(function (result) {
+                        console.log('GetCurrentState result:', result);
+                        currentState = result.currentState || 'loggedOut';
+                        updateUI();
+                    });
+                }
+
+                document.querySelector('#ConfigPage')
+                    .addEventListener('pageshow', function () {
+                        Dashboard.showLoadingMsg();
+                        ApiClient.ajax({
+                            type: "GET",
+                            url: ApiClient.getUrl("Plugins/ACdb/GetPluginSecret"),
+                            dataType: "json"
+                        }).then(function (result) {
+                            document.querySelector('#PluginSecret').value = result.pluginSecret || '';
+                            Dashboard.hideLoadingMsg();
+                            fetchCurrentState();
+                        });
+                    });
+
+                function handleButtonClick(btnId, url) {
+                    pollSyncStatus();
+
+                    errors = [];
+                    showErrors();
+                    Dashboard.showLoadingMsg();
+
+                    let payload = { ButtonType: btnId };
+                    if (btnId === 'LoginButton') {
+                        payload.PluginSecret = document.querySelector('#PluginSecret').value;
+                    }
+                    if (btnId === 'WebUrlWithTokenButton' && url) {
+                        payload.Url = url;
+                    }
+
+                    ApiClient.ajax({
+                        type: "POST",
+                        url: ApiClient.getUrl("Plugins/ACdb/ButtonClick"),
+                        dataType: "json",
+                        contentType: "application/json",
+                        data: JSON.stringify(payload)
+                    }).then(function (result) {
+                        Dashboard.hideLoadingMsg();
+                        if (result.message) {
+                            // Check if message is a URL
+                            if (/^https?:\/\/.+/i.test(result.message)) {
+                                const goToUrl = document.getElementById('GoToUrl');
+                                goToUrl.href = result.message;
+                                goToUrl.click();
+                            } else {
+                                Dashboard.alert(result.message);
+                            }
+                        }
+                        fetchCurrentState();
+                    }).catch(function () {
+                        Dashboard.hideLoadingMsg();
+                        Dashboard.alert("There was an error, check your logs.");
+                    });
+                }
+
+                document.getElementById('ConfigPage').addEventListener('click', function (e) {
+                    const btn = e.target.closest('button[id]');
+                    // List of button IDs to ignore
+                    const excludedIds = ['next-slide','ShowLogInButton'];
+                    if (btn && !excludedIds.includes(btn.id)) {
+                        if (btn.id === 'CreateUserButton') {
+                            if (!window.confirm('Create a new user on ACdb.tv and log your plugin in automatically?  You can use your Secret Key to manage your account on ACdb.tv at any time.')) {
+                                e.preventDefault();
+                                return;
+                            }
+                        }
+                        handleButtonClick(btn.id);
+                        e.preventDefault();
+                    }
+                });
+
+                // This is the interval between checking for message when syncing to give live update
+                let pollInterval = 500;
+                let pollHandle = null;
+                let errors = [];
+
+                function showErrors() {
+                    const errorContainer = document.getElementById('errorContainer');
+                    const errorList = document.getElementById('errorList');
+                    errorList.innerHTML = '';
+                    errors.forEach(function (err) {
+                        const li = document.createElement('li');
+                        li.textContent = err;
+                        errorList.appendChild(li);
+                    });
+                    errorContainer.style.display = errors.length > 0 ? 'block' : 'none';
+                }
+
+                function pollSyncStatus() {
+                    pollHandle = setInterval(function () {
+                        ApiClient.ajax({
+                            type: "GET",
+                            url: ApiClient.getUrl("Plugins/ACdb/SyncStatus"),
+                            dataType: "json"
+                        }).then(function (result) {
+                            if (result.statuses && result.statuses.length) {
+                                result.statuses.forEach(status => Dashboard.alert(status));
+                            }
+                            if (result.errors && result.errors.length) {
+                                errors.push(...result.errors);
+                                showErrors();
+                            }
+                            if (result.done) {
+                                clearInterval(pollHandle);
+                            }
+                        });
+                    }, pollInterval);
+                }
+
+            </script>
+    
+        </div> <!-- Script must be within this div or it will not load -->
+    </body>
+</html>
