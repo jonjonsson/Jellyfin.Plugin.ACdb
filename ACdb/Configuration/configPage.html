@@ -101,7 +101,7 @@
                 <div class="content-primary">
 
                     <h1>ACdb.tv</h1>
-                    <h3 style="margin-block-end:0em">Random sample of collections from ACdb.tv</h3>
+                    <h3 style="margin-block-end:0em">Random collections from ACdb.tv</h3>
                      
                     <form class="configForm">
 
@@ -236,7 +236,7 @@
 
                             <div class="inputContainer">
                                 <button id="WebWithTokenButton" is="emby-button" type="button" class="raised block button-alt emby-button">
-                                    <span>See All Collections on ACdb.tv</span>
+                                    <span>Browse All Collections</span>
                                 </button>
                             </div>
 
@@ -341,7 +341,7 @@
                 }
 
                 document.querySelector('#ConfigPage')
-                    .addEventListener('pageshow', function () {
+                    .addEventListener('viewshow', function () {
                         Dashboard.showLoadingMsg();
                         ApiClient.ajax({
                             type: "GET",
