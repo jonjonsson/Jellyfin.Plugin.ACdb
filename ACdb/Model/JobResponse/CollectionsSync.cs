@@ -8,5 +8,6 @@ internal partial class Response
     internal class CollectionsSync
     {
         public List<Collection> collections { get; set; }
+        public bool report_missing { get; set; } = true;
     }
 }

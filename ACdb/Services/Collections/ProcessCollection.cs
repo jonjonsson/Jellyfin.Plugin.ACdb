@@ -5,13 +5,9 @@ using ACdb.Model.Reporting;
 using ACdb.Settings;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Providers;
-using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace ACdb.Services.Collections;
@@ -21,16 +17,14 @@ internal class ProcessCollection
     private readonly ILibraryManager _libraryManager;
     private readonly Report _reporting;
     private readonly CollectionJobReport _collectionReport;
-    private readonly IFileSystem _fileSystem;
     private readonly ACdbUtils _utils;
     public static event EventHandler<BaseItem> ACdbCollectionCreated;
     private static DateAddedSorting _dateAddedSorting;
 
 
-    public ProcessCollection(ILibraryManager libraryManager, IFileSystem fileSystem, Report reporting, ACdbUtils utils)
+    public ProcessCollection(ILibraryManager libraryManager, Report reporting, ACdbUtils utils)
     {
         _libraryManager = libraryManager;
-        _fileSystem = fileSystem;
         _reporting = reporting;
         _collectionReport = new CollectionJobReport();
         _utils = utils;
@@ -132,7 +126,11 @@ internal class ProcessCollection
         }
 
         HandleItemDisplayOrder(collectionItem, collection.item_sorting);
-        await HandlePoster(collectionItem, collection);
+
+        if (collection.set_poster == true)
+        {
+            Manager.FetchImages.Add(collectionItem);
+        }
     }
 
 
@@ -214,7 +212,13 @@ internal class ProcessCollection
 
             if (!allCollectionNames.ContainsValue(name))
             {
-                return await CreateCollectionFromImdbsAsync(name, imdbIDs, collection_sid);
+                BaseItem item = await CreateCollectionFromImdbsAsync(name, imdbIDs, collection_sid);
+                if (item == null)
+                {
+                    return null;
+                }
+                Manager.FetchImages.Add(item);
+                return item.Id;
             }
 
             _reporting.AddToLog(LogTypeEnum.info, $"Collection {name} already exists. Will merge.", _collectionReport, new ActivityLogEventArgs { Description = "Job asked to create collection but a collection with the same name already exists." });
@@ -232,8 +236,8 @@ internal class ProcessCollection
         {
             SettingsManager.AddCollectionSidToGuid(collection_sid, collection.Id);
             return await UpdateCollectionAsync(collection, imdbIDs);
-        } 
-        
+        }
+
         _reporting.AddToLog(LogTypeEnum.error, $"Collection ID {collectionID} is not a BoxSet, cannot process collection.", _collectionReport);
         return null;
     }
@@ -266,7 +270,7 @@ internal class ProcessCollection
     }
 
 
-    private async Task<Guid?> CreateCollectionFromImdbsAsync(string name, List<string> listImdbIds, string collection_sid)
+    private async Task<BaseItem> CreateCollectionFromImdbsAsync(string name, List<string> listImdbIds, string collection_sid)
     {
         if (string.IsNullOrEmpty(name))
         {
@@ -296,7 +300,7 @@ internal class ProcessCollection
             _collectionReport.added_count = getItemsWithImdbResult.FoundCount;
             _collectionReport.cid = newCollection.Id.ToString();
             _collectionReport.missing_imdbs = getItemsWithImdbResult.MissingImdbIds;
-            return newCollection.Id;
+            return newCollection;
         }
         catch (Exception e)
         {
@@ -330,7 +334,7 @@ internal class ProcessCollection
             _reporting.AddToLog(LogTypeEnum.error, $"Error updating collection", _collectionReport, new ActivityLogEventArgs { Description = e.Message });
             return collection.Id;
         }
-        
+
     }
 
     private bool UpdateNameDescription(BoxSet collectionItem, string name, string description)
@@ -399,87 +403,6 @@ internal class ProcessCollection
         return _utils.SetSortName(collectionItem, newSortName);
     }
 
-
-    public async Task HandlePoster(BaseItem collectionItem, Response.Collection collectionResponse)
-    {
-        try
-        {
-            if (collectionResponse.no_poster == true)
-            {
-                SettingsManager.RemoveCollectionWithPoster(collectionItem.Id);
-                if (collectionResponse.set_poster == true)
-                {
-                    RemoveBoxSetPoster(collectionItem);
-                    await RefreshImageMetadata(collectionItem);
-                }
-            }
-            else if (collectionResponse.poster_id != null)
-            {
-                SettingsManager.AddCollectionWithPoster(collectionItem.Id);
-                if (collectionResponse.set_poster == true)
-                {
-                    LogManager.LogEvent(LogTypeEnum.info, $"Setting poster for collection: {collectionItem.Name}");
-                    await Task.Delay(2000); // Wait for a second to ensure the collection is ready
-                    await RefreshImageMetadata(collectionItem);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Error handling poster for collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = e.Message });
-        }
-    }
-
-
-    private async Task RefreshImageMetadata(BaseItem collectionItem)
-    {
-        MetadataRefreshOptions options = new(_utils.MetadataRefreshOptionsParam)
-        {
-            ImageRefreshMode = MetadataRefreshMode.FullRefresh,
-            MetadataRefreshMode = MetadataRefreshMode.FullRefresh,
-            ReplaceAllImages = true,
-        };
-
-        try
-        {
-            LogManager.LogEvent(LogTypeEnum.info, $"Refreshing metadata images for collection: {collectionItem.Name}");
-            await collectionItem.RefreshMetadata(options, new CancellationToken());
-        }
-        catch
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Error refreshing metadata for collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = "Refresh failed" });
-        }
-    }
-
-
-    public bool RemoveBoxSetPoster(BaseItem collectionItem)
-    {
-        if (collectionItem == null || CollectionManager.IsCollection(collectionItem) is false)
-        {
-            LogManager.Error($"Collection sync requested to remove poster from a collection that does not exist or is not a collection.");
-            return false;
-        }
-
-        try
-        {
-            ItemImageInfo imageInfo = _utils.GetImageInfo(collectionItem, ImageType.Primary, 0);
-            if (imageInfo == null)
-            {
-                LogManager.Error($"Collection sync requested to remove poster from a collection that does not have a poster.");
-                return false;
-            }
-
-            collectionItem.RemoveImage(imageInfo);
-            _utils.UpdateItem(collectionItem, ItemUpdateType.MetadataEdit); // Not sure if required, just in case
-            LogManager.LogEvent(LogTypeEnum.info, $"Removed poster from collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = imageInfo.Path });
-            return true;
-        }
-        catch (Exception e)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Error removing poster from collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = e.Message });
-            return false;
-        }
-    }
 
     private string ValidateExistingCollection(string collectionID, string name)
     {

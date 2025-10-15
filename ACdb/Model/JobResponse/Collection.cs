@@ -1,5 +1,4 @@
 #pragma warning disable IDE1006 // Disable naming warning
-using System;
 using System.Collections.Generic;
 
 namespace ACdb.Model.JobResponse;
@@ -25,7 +24,7 @@ internal partial class Response
         public string sort_name { get; set; }
         public bool? sort_to_top { get; set; }
         public bool? set_poster { get; set; }
-        public bool? no_poster { get; set; }
+        public bool? no_poster { get; set; } // todo might not use
         public string poster_id { get; set; }
         public ItemSorting? item_sorting { get; set; }
     }

@@ -1,4 +1,3 @@
-
 using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities.Movies;
@@ -40,19 +39,26 @@ public partial class ACdbUtils
     public readonly ILibraryManager LibraryManager;
     public readonly IDirectoryService DirectoryService;
     public readonly IFileSystem FileSystem;
+    public readonly Api ApiCon;
     private readonly User _adminUser;
 
-    public ACdbUtils(ILibraryManager libraryManager, IFileSystem fileSystem, IDirectoryService directoryService, IUserManager userManager)
+    public ACdbUtils(ILibraryManager libraryManager, IFileSystem fileSystem, IDirectoryService directoryService, IUserManager userManager, Api apiCon)
     {
         LibraryManager = libraryManager;
         DirectoryService = directoryService;
         FileSystem = fileSystem;
+        ApiCon = apiCon;
 
         MetadataRefreshOptionsParam = directoryService;
 
         _adminUser = userManager.Users
             .Where(i => i.HasPermission(PermissionKind.IsAdministrator))
             .First();
+    }
+
+    public User GetAdminUser()
+    {
+        return _adminUser;
     }
 
 
@@ -171,7 +177,7 @@ public partial class ACdbUtils
         return imdbIds;
     }
 
-    
+
     public CollectionOperationResult GetItemsIdsWithImdbIds(List<string> ImdbIds)
     {
         CollectionOperationResult result = new();

@@ -6,11 +6,13 @@ using ACdb.Services.Collections;
 using ACdb.Services.Scheduling;
 using ACdb.Settings;
 using MediaBrowser.Controller.Collections;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Tasks;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,15 +20,18 @@ namespace ACdb;
 
 public static class Manager
 {
+    public static HashSet<BaseItem> FetchImages = [];
     private static ILibraryManager _libraryManager;
     private static IFileSystem _fileSystem;
     private static SchedulingManager _schedulingManager;
     private static ITaskManager _taskManager;
     private static DateAddedSorting _dateAddedSorting;
-    private static ACdbUtils _utils;
+    public static ACdbUtils Utils { get; private set; }
     private static Api _api;
     private static int ScheduleIntervalMinutes { get; set; } = PluginConfig.ScheduledTaskMinutesBetweenRuns;
     private static Report _jobReport;
+    private static ImageSetter _imageFetcher;
+    private static Library _library;
 
     public static void Initialize(ILibraryManager libraryManager, IDirectoryService directoryService, ITaskManager taskManager, ICollectionManager collectionManager, IFileSystem fileSystem, IUserManager userManager)
     {
@@ -35,15 +40,17 @@ public static class Manager
         _taskManager = taskManager;
         EventsManager.RegisterEventHandler(EventType.Progress, ActivityEventTriggered);
         _api = new Api();
-        _utils = new ACdbUtils(_libraryManager, _fileSystem, directoryService, userManager);
-        _dateAddedSorting = new DateAddedSorting(_utils, _libraryManager);
+        Utils = new ACdbUtils(_libraryManager, _fileSystem, directoryService, userManager, _api);
+        _dateAddedSorting = new DateAddedSorting(Utils, _libraryManager); // Updated usage
         _schedulingManager = new SchedulingManager(_taskManager);
+        _imageFetcher = new ImageSetter();
+        _library = new Library(_libraryManager);
 
         collectionManager.ItemsRemovedFromCollection += (sender, args) =>
         {
             _dateAddedSorting.ItemsRemovedFromCollectionEvent(args.Collection.Id, args.ItemsChanged);
 
-            int itemCount = _utils.CollectionItemCount(args.Collection);
+            int itemCount = Utils.CollectionItemCount(args.Collection); // Updated usage
             if (args.Collection == null || itemCount == 0)
             {
                 SettingsManager.CollectionRemovedCleanup(args.Collection.Id); // todo next this is not called on jellyfin delete on server, I could just do a settings clean up after every sync?
@@ -190,6 +197,7 @@ public static class Manager
         if (status is 204) // No jobs to process
         {
             LogManager.LogEvent(LogTypeEnum.info, $"No new jobs found, you are up to date.", new ActivityLogEventArgs { Progress = 100 });
+            await _library.UpdateLibraryNames();
             return;
         }
         else if (status is 401)
@@ -210,8 +218,9 @@ public static class Manager
         _jobReport.JobReport.api_version = response.api_version;
         _jobReport.JobReport.client_min_version = response.min_client_version;
 
-        ProcessCollections processCollections = new(_libraryManager, _fileSystem, _jobReport, _api, progress, currentProgress, _utils);
+        ProcessCollections processCollections = new(_libraryManager, _jobReport, progress, currentProgress, Utils); // Updated usage
         await processCollections.ProcessCollectionsAsync(response.collections_sync);
+        _library.UpdateLibraryImages(response.library_sync);
 
         bool sentReport = await SendManagerReport(_jobReport);
 
@@ -221,6 +230,9 @@ public static class Manager
         }
 
         LogManager.LogEvent(LogTypeEnum.info, "Sync Complete", new ActivityLogEventArgs { Progress = 100, Description = _jobReport.Summarize() });
+        await _imageFetcher.FetchAndSetImageForCollection_sid(FetchImages);
+        FetchImages.Clear(); // Clear FetchImages so that we don't keep fetching images for same collections over and over
+        await _library.UpdateLibraryNames(); // also above when there is nothing to process
     }
 
     private static async Task<bool> SendManagerReport(Report report)

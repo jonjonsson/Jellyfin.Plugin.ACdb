@@ -7,6 +7,9 @@ namespace ACdb.Services;
 
 public class Api
 {
+    private static DateTime _lastCallUtc = DateTime.MinValue;
+    private static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(2);
+
     public async Task<string> Get(string apiKey, string url, CancellationToken cancellationToken)
     {
         string json = await WebRequestAPI(url, "GET", null, apiKey, cancellationToken).ConfigureAwait(false);
@@ -27,11 +30,15 @@ public class Api
         string secret = null, 
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(secret))
+
+        var now = DateTime.UtcNow;
+        var sinceLast = now - _lastCallUtc;
+        if (sinceLast < MinInterval)
         {
-            LogManager.Error($"apiKey is null or empty, cannot make request to {url}");
-            return null;
+            var wait = MinInterval - sinceLast;
+            await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
         }
+        _lastCallUtc = DateTime.UtcNow;
 
         LogManager.Info($"Sending {method} request to {url}");
 

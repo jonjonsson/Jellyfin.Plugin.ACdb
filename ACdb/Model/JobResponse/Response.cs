@@ -9,5 +9,6 @@ internal partial class Response
     public int api_version { get; set; }
     public string min_client_version { get; set; }
     public CollectionsSync collections_sync { get; set; }
+    public LibrarySync library_sync { get; set; }
 
 }

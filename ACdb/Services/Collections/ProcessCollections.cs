@@ -1,7 +1,6 @@
 using ACdb.Model.JobResponse;
 using ACdb.Model.Reporting;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.IO;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,21 +10,17 @@ namespace ACdb.Services.Collections;
 public class ProcessCollections
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IFileSystem _fileSystem;
     private readonly Report _reporting;
     private readonly IProgress<double> _progress;
     private double _currentProgress;
     private readonly ACdbUtils _utils;
-    private readonly Api _api;
 
-    internal ProcessCollections(ILibraryManager libraryManager, IFileSystem fileSystem, Report reporting, Api api, IProgress<double> progress, double currentProgress, ACdbUtils utils)
+    internal ProcessCollections(ILibraryManager libraryManager, Report reporting, IProgress<double> progress, double currentProgress, ACdbUtils utils)
     {
         _libraryManager = libraryManager;
         _reporting = reporting;
         _progress = progress;
         _currentProgress = currentProgress;
-        _fileSystem = fileSystem;
-        _api = api;
         _utils = utils;
     }
 
@@ -43,7 +38,7 @@ public class ProcessCollections
 
         foreach (Response.Collection collection in collectionsSync.collections)
         {
-            ProcessCollection processCollection = new(_libraryManager, _fileSystem, _reporting, _utils);
+            ProcessCollection processCollection = new(_libraryManager, _reporting, _utils);
             await processCollection.ProcessCollectionAsync(collection);
             CollectionJobReport collectionReport = processCollection.GetCollectionReport();
             _currentProgress += progressPerCollection;
@@ -51,7 +46,11 @@ public class ProcessCollections
 
             try
             {
-                string response = await _api.Post(Manager.ApiKey, collectionReport, PluginConfig.PostJobResultsUrl, CancellationToken.None);
+                if (collectionsSync.report_missing == false)
+                {
+                    collectionReport.missing_imdbs = null;
+                }
+                string response = await Manager.Utils.ApiCon.Post(Manager.ApiKey, collectionReport, PluginConfig.PostJobResultsUrl, CancellationToken.None);
             }
             catch (Exception ex)
             {

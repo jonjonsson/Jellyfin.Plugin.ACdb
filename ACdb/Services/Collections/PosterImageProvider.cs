@@ -9,6 +9,8 @@ using MediaBrowser.Model.Providers;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ACdb.Model.Reporting;
+using ACdb.Model.JobResponse;
 
 
 namespace ACdb.Services.Collections;
@@ -37,51 +39,81 @@ public class PosterImageProvider : IRemoteImageProvider
         }
     }
 
-    public Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+    public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
     {
-        List<RemoteImageInfo> images = [];
+        List<RemoteImageInfo> images = new List<RemoteImageInfo>();
 
-        if (item is BoxSet == false)
+        if (!(item is BoxSet))
         {
-            return Task.FromResult<IEnumerable<RemoteImageInfo>>(images);
-        }
-
-        if (SettingsManager.IsCollectionWithPoster(item.Id) == false)
-        {
-            LogManager.Info($"Collection {item.Name} does not have poster");
-            return Task.FromResult<IEnumerable<RemoteImageInfo>>(images);
+            return [];
         }
 
         string collection_sid = SettingsManager.GetCollectionSidByGuid(item.Id);
 
         if (string.IsNullOrWhiteSpace(collection_sid))
         {
-            LogManager.Error($"Could not lookup ACdb ID for {item.Name}");
-            return Task.FromResult<IEnumerable<RemoteImageInfo>>(images);
+            LogManager.LogEvent(LogTypeEnum.error, $"Could not lookup ACdb ID for {item.Name}");
+            return [];
         }
 
-        string url = string.Format(PluginConfig.ImageUrlTemplate, collection_sid);
-        string apiKeyHashed = Manager.ApiKeyHashed;
+        string imageProviderUrl = string.Format(PluginConfig.ImageProviderUrl, collection_sid) + "/" + Manager.ApiKeyHashed;
 
-        if (string.IsNullOrWhiteSpace(apiKeyHashed) == false)
+        string json;
+        try
         {
-            url = $"{url}/{apiKeyHashed}";
+            json = await Manager.Utils.ApiCon.Get(null, imageProviderUrl, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return [];
+        }
+        catch (Exception ex)
+        {
+            LogManager.LogEvent(LogTypeEnum.error, $"Error fetching collection images from {imageProviderUrl}: {ex}");
+            return [];
         }
 
-        images.Add(new RemoteImageInfo
+        if (string.IsNullOrWhiteSpace(json))
         {
-            Type = ImageType.Primary,
-            ProviderName = Name,
-            Url = url
-        });
+            return [];
+        }
 
-        return Task.FromResult<IEnumerable<RemoteImageInfo>>(images);
+        ImagesResponse imagesResponse;
+        try
+        {
+            imagesResponse = JsonManager.DeserializeFromString<ImagesResponse>(json);
+        }
+        catch (Exception e)
+        {
+            LogManager.LogEvent(LogTypeEnum.error, $"Could not parse collection images from {imageProviderUrl}: {e}");
+            return [];
+        }
+
+        if (imagesResponse == null || imagesResponse.images == null)
+        {
+            return [];
+        }
+
+        foreach (ACdbImageInfo image in imagesResponse.images)
+        {
+            if (string.IsNullOrWhiteSpace(image.url) || image.remove == true)
+            {
+                continue;
+            }
+            images.Add(new RemoteImageInfo
+            {
+                Type = image.type,
+                ProviderName = Name,
+                Url = image.url
+            });
+        }
+        return images.ToArray();
     }
 
 
     public IEnumerable<ImageType> GetSupportedImages(BaseItem item)
     {
-        return [ImageType.Primary];
+        return [ImageType.Primary, ImageType.Backdrop];
     }
 
     public bool Supports(BaseItem item)

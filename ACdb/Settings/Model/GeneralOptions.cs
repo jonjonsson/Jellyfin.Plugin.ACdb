@@ -29,10 +29,10 @@ public class GeneralOptions
 
     public List<CollectionSidGuidPair> CollectionSidToGui { get; set; } = [];
 
-    public HashSet<Guid> CollectionsWithPosters { get; set; } = [];
-
     public HashSet<string> CollectionsSidWithDateAddedSortNames { get; set; } = [];
 
     public List<DateTime> LastSynced { get; set; }
+
+    public string LastLibraryHash { get; set; }
 
 }

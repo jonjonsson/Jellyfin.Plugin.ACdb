@@ -105,14 +105,12 @@ internal static class SettingsManager
     public static void CollectionRemovedCleanup(Guid guid)
     {
         RemoveCollectionWithDateAddedSortName(guid);
-        RemoveCollectionWithPoster(guid);
         RemoveCollectionSidToGuid(guid);
     }
 
     public static void CollectionRemovedCleanup(string collection_sid)
     {
         RemoveCollectionWithDateAddedSortName(collection_sid);
-        RemoveCollectionWithPoster(GetCollectionGuidBySid(collection_sid) ?? Guid.Empty);
         RemoveCollectionSidToGuid(collection_sid);
     }
 
@@ -138,32 +136,20 @@ internal static class SettingsManager
         SaveSettings();
     }
 
-    public static void AddCollectionWithPoster(Guid id)
-    {
-        _settings.CollectionsWithPosters.Add(id);
-        SaveSettings();
-    }
-
-    public static void RemoveCollectionWithPoster(Guid id)
-    {
-        if (id == Guid.Empty)
-        {
-            return;
-        }
-        if (_settings.CollectionsWithPosters.Remove(id))
-        {
-            SaveSettings();
-        }
-    }
-
-    public static bool IsCollectionWithPoster(Guid id)
-    {
-        return _settings.CollectionsWithPosters.Contains(id);
-    }
-
     public static bool IsCollectionWithDateAddedSortName(Guid id)
     {
         return IsCollectionSidWithDateAddedSortName(GetCollectionSidByGuid(id));
+    }
+
+    public static string GetLastLibraryHash()
+    {
+        return _settings?.LastLibraryHash;
+    }
+
+    public static void SetLastLibraryHash(string hash)
+    {
+        _settings.LastLibraryHash = hash;
+        SaveSettings();
     }
 
     public static void AddCollectionSidWithDateAddedSortName(string sid)

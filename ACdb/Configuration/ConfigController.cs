@@ -201,6 +201,8 @@ public class ConfigController : ControllerBase
         {
             message = "You are logged in.";
             await SyncNow();
+            await Task.Delay(5000);
+            await SyncNow(); // If user has multiple plugin secrets, this will get library images on this sync
         }
 
         return (success, message);
