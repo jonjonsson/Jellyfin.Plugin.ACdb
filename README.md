@@ -64,10 +64,6 @@ For **Emby** installation, please use the Emby plugin catalog. [More information
 - For help, questions, or feedback, [ACdb.tv Contact Page](https://acdb.tv/contact)
 - Join us on [Discord](https://discord.gg/9kWgmGwg5e), for all of the above. New collections and posters are announced there as well.
 
-## Versions
-
-**2.2.0.0** — First version that includes Jellyfin support.
-
 ## License
 
 This plugin is licensed under the GPLv3.
