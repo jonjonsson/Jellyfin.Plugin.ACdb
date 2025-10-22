@@ -10,7 +10,7 @@ public static class PluginConfig
     public static string PluginType { get; } =
         Model.PluginType.jellyfin.ToString();
     public static Version PluginVersion { get; set; } 
-    public static string ClientID { get; set; }
+    public static string ClientID { get; set; } //
     public static Version ClientVersion { get; set; }
 
     public static string Guid { get; } = "06411f7c-08f6-41da-9e2a-a79b56144845"; 

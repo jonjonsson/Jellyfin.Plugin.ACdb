@@ -1,4 +1,3 @@
-using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities;
@@ -9,6 +8,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Data;
+using Jellyfin.Database.Implementations.Enums;
 
 namespace ACdb.Services;
 
@@ -51,13 +53,17 @@ public partial class ACdbUtils
 
         MetadataRefreshOptionsParam = directoryService;
 
-        _adminUser = userManager.Users
-            .Where(i => i.HasPermission(PermissionKind.IsAdministrator))
-            .First();
+        IEnumerable<User> users = userManager.Users;
+        _adminUser = users.FirstOrDefault(u => u.HasPermission(PermissionKind.IsAdministrator));
+
     }
 
     public User GetAdminUser()
     {
+        if (_adminUser == null)
+        {
+            LogManager.Error("Could not find Admin user.");
+        }
         return _adminUser;
     }
 

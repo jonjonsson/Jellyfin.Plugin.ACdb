@@ -408,12 +408,20 @@ internal class ProcessCollection
     {
         if (string.IsNullOrEmpty(collectionID))
             return collectionID;
+        BaseItem existingCollection = null;
+        try
+        {
+            existingCollection = _libraryManager.GetItemById(collectionID);
+        }
+        catch (Exception)
+        {
+            LogManager.LogEvent(LogTypeEnum.warning, $"Collection ID not valid format, user may be moving from Emby to Jellyfin. Collection will be re-created.");
+        }
 
-        BaseItem existingCollection = _libraryManager.GetItemById(collectionID);
         string url = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}";
         if (existingCollection == null)
         {
-            LogManager.LogEvent(LogTypeEnum.warning, $"Collection {name} was not found. It will be recreated", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
+            LogManager.LogEvent(LogTypeEnum.info, $"Collection {name} was not found. It will be recreated", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
             return null;
         }
 

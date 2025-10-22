@@ -1,4 +1,5 @@
 using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Enums;
 using ACdb.Model.JobResponse;
 using ACdb.Settings;
 using MediaBrowser.Controller.Entities;

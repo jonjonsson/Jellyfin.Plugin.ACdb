@@ -8,8 +8,8 @@
     },
     "Jellyfin": {
       "commandName": "Executable",
-      "executablePath": "C:\\Users\\jonjo\\source\\repos\\KontentCommander\\server-installs\\jellyfin\\jellyfin_10.10.7\\jellyfin.exe",
-      "workingDirectory": "C:\\Users\\jonjo\\source\\repos\\KontentCommander\\server-installs\\jellyfin\\jellyfin_10.10.7"
+      "executablePath": "C:\\Program Files\\Jellyfin\\Server\\jellyfin.exe",
+      "workingDirectory": "C:\\Program Files\\Jellyfin\\Server"
     }
   }
 }

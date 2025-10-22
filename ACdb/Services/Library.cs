@@ -1,7 +1,6 @@
 using ACdb.Model.JobResponse;
 using ACdb.Model.Reporting;
 using ACdb.Settings;
-using Jellyfin.Data.Entities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
@@ -115,7 +114,7 @@ namespace ACdb.Services
                 return libraries;
             }
 
-            List<BaseItem> results = _libraryManager.RootFolder.GetChildren(Manager.Utils.GetAdminUser(), true);
+            IReadOnlyList<BaseItem> results = _libraryManager.RootFolder.GetChildren(Manager.Utils.GetAdminUser(), true);
 
             if (results == null)
             {

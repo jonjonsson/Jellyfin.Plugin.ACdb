@@ -42,11 +42,11 @@ public partial class ACdbUtils
 
     public List<Guid> AllCollections()
     {
-        List<Guid> collections = LibraryManager.GetItemIds(new InternalItemsQuery
+        IReadOnlyList<Guid> collections = LibraryManager.GetItemIds(new InternalItemsQuery
         {
             IncludeItemTypes = [BaseItemKind.BoxSet],
         });
-        return collections;
+        return collections.ToList();
     }
 
     public List<BaseItem> GetItemsIdsWithImdbIdsBatch(List<string> batch)

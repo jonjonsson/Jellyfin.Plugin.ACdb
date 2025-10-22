@@ -2,10 +2,11 @@
 name: "ACdb.tv"
 guid: "06411f7c-08f6-41da-9e2a-a79b56144845"
 # TODO BUILD Should be same as project version
-version: "2.3.0.3"
-# 10.10.7 is the minimum Jellyfin version this plugin supports, if I want to go lower I need to install different nuget packages
-targetAbi: "10.10.7"
-framework: "net8.0"
+version: "2.3.1.0"
+# TODO BUILD update target version
+targetAbi: "10.11.0"
+# TODO BUILD update framework
+framework: "net9.0"
 overview: "Synchronize Collections from ACdb.tv"
 description: >
   Add dynamic, auto-updating collections of movies and
@@ -16,5 +17,5 @@ artifacts:
 - "Jellyfin.Plugin.ACdb.dll"
 # TODO BUILD update changelog
 changelog: >
-  Support for collections backdrops. Added better poster handling. Support for upcoming feature Library Posters. Support for upcoming optional feature to not send missing IMDB IDs.
+  Support for Jellyfin version 10.11.0. This version of the plugin will not work with lower versions of Jellyfin. Use previous version if you have an older Jellyfin install.
 image: "ACdb\\Jellyfin.Plugin.ACdb.jpg"

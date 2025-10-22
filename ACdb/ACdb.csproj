@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <Nullable>disable</Nullable>
         <IsPublishable>True</IsPublishable>
         <ErrorReport>none</ErrorReport>
-        <AssemblyVersion>2.3.0.3</AssemblyVersion>
-        <FileVersion>2.3.0.3</FileVersion>
+        <AssemblyVersion>2.3.1.0</AssemblyVersion>
+        <FileVersion>2.3.1.0</FileVersion>
         <AssemblyInformationalVersion>4.8.0.0</AssemblyInformationalVersion>
         <ProductVersion>4.8.0.0</ProductVersion>
         <Platforms>AnyCPU</Platforms>
@@ -34,8 +34,8 @@
 	</PropertyGroup>
 	
     <ItemGroup>
-        <PackageReference Include="Jellyfin.Controller" Version="10.10.7" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
-        <PackageReference Include="Jellyfin.Model" Version="10.10.7" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+        <PackageReference Include="Jellyfin.Controller" Version="10.11.0" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+        <PackageReference Include="Jellyfin.Model" Version="10.11.0" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
     </ItemGroup>
 	
     <ItemGroup>

@@ -118,20 +118,14 @@ internal class SchedulingManager
                 [
                     new TaskTriggerInfo
                     {
-                        Type = TaskTriggerInfo.TriggerInterval,
+                        Type = TaskTriggerInfoType.IntervalTrigger,
                         IntervalTicks = TimeSpan.FromMinutes(minutes).Ticks,
                         MaxRuntimeTicks = TimeSpan.FromMinutes(60).Ticks,
                     },
-                    new TaskTriggerInfo
-                    {
-                        Type = TaskTriggerInfo.TriggerStartup,
-                        MaxRuntimeTicks = TimeSpan.FromMinutes(60).Ticks,
-                    }
                 ];
 
-                if (task.Triggers.Count == 2 &&
-                    task.Triggers.Any(t => t.Type == TaskTriggerInfo.TriggerInterval && t.IntervalTicks == newTriggers[0].IntervalTicks) &&
-                    task.Triggers.Any(t => t.Type == TaskTriggerInfo.TriggerStartup))
+                if (task.Triggers.Count == 1 &&
+                    task.Triggers.Any(t => t.Type == TaskTriggerInfoType.IntervalTrigger && t.IntervalTicks == newTriggers[0].IntervalTicks))
                 {
                     return;
                 }
