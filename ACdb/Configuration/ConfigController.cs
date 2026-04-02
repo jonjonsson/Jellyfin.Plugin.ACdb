@@ -1,5 +1,7 @@
+using ACdb.Model.Authentication;
 using ACdb.Model.Reporting;
 using ACdb.Services;
+using ACdb.Services.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,6 +68,7 @@ public class ConfigController : ControllerBase
         }
     }
 
+
     [HttpGet("GetPluginInfo")]
     public IActionResult GetPluginInfo()
     {
@@ -77,11 +80,13 @@ public class ConfigController : ControllerBase
         });
     }
 
+
     [HttpGet("GetPluginSecret")]
     public IActionResult GetPluginSecret()
     {
         return Ok(new { pluginSecret = PluginSecret });
     }
+
 
     [HttpGet("GetCurrentState")]
     public IActionResult GetCurrentState()
@@ -89,12 +94,14 @@ public class ConfigController : ControllerBase
         return Ok(new { currentState = CurrentState });
     }
 
+
     [HttpGet("GetPosterGrid")]
     public async Task<IActionResult> GetPosterGridApiUrl()
     {
         string json = await HttpClientManager.Get($"{PluginConfig.WebSiteUrl}/poster_grid_data?full_url=true");
         return Ok(new { json });
     }
+
 
     [HttpPost("ButtonClick")]
     public async Task<IActionResult> ButtonClick([FromBody] ButtonClickRequest request)
@@ -129,6 +136,12 @@ public class ConfigController : ControllerBase
         {
             (success, message) = await SyncNow();
         }
+        else if (request.ButtonType == "ResetScheduleButton")
+        {
+            Manager.ResetScheduleInterval();
+            success = true;
+            message = "Schedule has been reset to default.";
+        }
         else if (request.ButtonType == "LogoutButton")
         {
             Manager.Logout();
@@ -146,12 +159,14 @@ public class ConfigController : ControllerBase
         return Ok(new { success, message, currentState = CurrentState });
     }
 
+
     public class ButtonClickRequest
     {
         public string ButtonType { get; set; }
         public string PluginSecret { get; set; }
         public string Url { get; set; }
     }
+
 
     [HttpPost("SyncNow")]
     public static async Task<(bool success, string message)> SyncNow()
@@ -160,6 +175,7 @@ public class ConfigController : ControllerBase
         await Manager.ExecuteJobTaskAsync();
         return (true, "Finished");
     }
+
 
     [HttpGet("SyncStatus")]
     public IActionResult SyncStatus()
@@ -189,42 +205,28 @@ public class ConfigController : ControllerBase
         });
     }
 
-    private static async Task<(bool success, string message)> LogInAsync(string pluginSecret)
+
+    private static async Task<(bool success, string message)> LogInAsync(string apiKeyInput)
     {
-        if (string.IsNullOrWhiteSpace(pluginSecret))
+
+        if (string.IsNullOrWhiteSpace(apiKeyInput))
         {
             return (true, "Plugin secret is empty. Please enter your Secret key from ACdb.tv.");
         }
 
-        (bool success, string message) = await Manager.RegisterWithApiKey(pluginSecret);
-        if (success)
-        {
-            message = "You are logged in.";
-            await SyncNow();
-            await Task.Delay(5000);
-            await SyncNow(); // If user has multiple plugin secrets, this will get library images on this sync
-        }
-
-        return (success, message);
+        return await RegisterPlugin.VerifyExistingApiKey(apiKeyInput);
     }
+
 
     private static async Task<(bool success, string message)> Createuser()
     {
-        (bool success, string message) = await Manager.CreateUser();
-        if (success)
-        {
-            message = "User created successfully.";
-        }
-        else
-        {
-            message = "Failed to create user: " + message;
-        }
-        return (success, message);
+        return await RegisterPlugin.RegisterAsync();
     }
+
 
     private static async Task<(bool success, string message)> GetLoginLink()
     {
-        string token = await Manager.GetLoginTokenAsync();
+        string token = await RegisterPlugin.GetLoginTokenAsync(Manager.ApiKey);
         if (string.IsNullOrEmpty(token))
         {
             return (false, "Failed to generate login token.");
@@ -233,9 +235,10 @@ public class ConfigController : ControllerBase
         return (true, loginUrl);
     }
 
+
     private static async Task<(bool success, string message)> GetAccountLink()
     {
-        string token = await Manager.GetLoginTokenAsync();
+        string token = await RegisterPlugin.GetLoginTokenAsync(Manager.ApiKey);
         if (string.IsNullOrEmpty(token))
         {
             return (false, "Failed to generate login token.");
@@ -243,6 +246,7 @@ public class ConfigController : ControllerBase
         string loginUrl = $"{PluginConfig.WebSiteUrl}/account?login={token}&source=plugin";
         return (true, loginUrl);
     }
+
 
     private static async Task<(bool success, string message)> GetUrlWithToken(string url)
     {
@@ -256,7 +260,7 @@ public class ConfigController : ControllerBase
             return (true, $"{url}?source=plugin");
         }
 
-        string token = await Manager.GetLoginTokenAsync();
+        string token = await RegisterPlugin.GetLoginTokenAsync(Manager.ApiKey);
         if (string.IsNullOrEmpty(token))
         {
             return (false, "Failed to generate login token.");

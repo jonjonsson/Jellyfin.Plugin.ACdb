@@ -1,7 +1,8 @@
-namespace ACdb.Model;
-
-public enum PluginType
+namespace ACdb.Model
 {
-    emby,
-    jellyfin
+    public enum PluginType
+    {
+        emby,
+        jellyfin
+    }
 }

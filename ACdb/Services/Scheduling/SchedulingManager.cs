@@ -5,181 +5,171 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ACdb.Services.Scheduling;
-
-internal class SchedulingManager
+namespace ACdb.Services.Scheduling
 {
-    private readonly ITaskManager _taskManager;
-    private readonly string _key = PluginConfig.ScheduledTaskKey;
-
-
-    public SchedulingManager(ITaskManager taskManager)
+    internal class SchedulingManager
     {
-        _taskManager = taskManager;
-    }
+        private readonly ITaskManager _taskManager;
+        private readonly string _key = PluginConfig.ScheduledTaskKey;
 
-    public int? GetSecondsSinceLastScheduledRun()
-    {
-        IScheduledTaskWorker task = _taskManager.ScheduledTasks.FirstOrDefault(x => x.ScheduledTask.Key == _key);
-        if (task == null)
+        public SchedulingManager(ITaskManager taskManager)
         {
-            return null;
+            _taskManager = taskManager;
         }
 
-        if (task.LastExecutionResult == null)
+        public int? GetSecondsSinceLastScheduledRun()
         {
-            return null;
-        }
-
-        DateTimeOffset? lastRun = task.LastExecutionResult.EndTimeUtc;
-        if (!lastRun.HasValue)
-        {
-            return null;
-        }
-
-        int secondsSinceRan = (int)(DateTimeOffset.UtcNow - lastRun.Value).TotalSeconds;
-        return secondsSinceRan;
-    }
-
-    public int? GetSecondsUntilNextRun()
-    {
-        IScheduledTaskWorker task = _taskManager.ScheduledTasks.FirstOrDefault(x => x.ScheduledTask.Key == _key);
-        if (task == null)
-        {
-            LogManager.Warning("Can not find task");
-            return null;
-        }
-
-        if (task.Triggers is null || task.Triggers.Count == 0)
-        {
-            return null;
-        }
-
-        TaskTriggerInfo trigger = task.Triggers[0];
-        long? intervalTicks = trigger.IntervalTicks;
-
-        if (!intervalTicks.HasValue)
-        {
-            LogManager.Error("IntervalTicks is null");
-            return null;
-        }
-
-        int? lastRan = GetSecondsSinceLastScheduledRun();
-        if (lastRan == null)
-        {
-            return null;
-        }
-
-        int? nextRun = (int)TimeSpan.FromTicks(intervalTicks.Value).TotalSeconds - lastRan;
-        return nextRun;
-    }
-
-    public string ConvertSecondsToHumanReadable(int sec)
-    {
-
-        int hours = sec / 3600;
-        sec %= 3600;
-        int minutes = sec / 60;
-        sec %= 60;
-
-        string hourString = hours == 1 ? "hour" : "hours";
-        string minuteString = minutes == 1 ? "minute" : "minutes";
-        string secondString = sec == 1 ? "second" : "seconds";
-
-        if (hours > 0)
-        {
-            return $"{hours} {hourString}, {minutes} {minuteString} and {sec} {secondString}";
-        }
-        else if (minutes > 0)
-        {
-            return $"{minutes} {minuteString} and {sec} {secondString}";
-        }
-        else
-        {
-            return $"{sec} {secondString}";
-        }
-    }
-
-    public void SetInterval(int minutes)
-    {
-        List<IScheduledTaskWorker> allTasks = _taskManager.ScheduledTasks.ToList();
-
-        if (allTasks.Count == 0)
-        {
-            LogManager.Error("No tasks found, can not set interval");
-            return;
-        }
-
-        foreach (IScheduledTaskWorker task in allTasks)
-        {
-            if (task.ScheduledTask.Key == _key)
+            IScheduledTaskWorker task = _taskManager.ScheduledTasks.FirstOrDefault(x => x.ScheduledTask.Key == _key);
+            if (task == null)
             {
-                List<TaskTriggerInfo> newTriggers =
-                [
-                    new TaskTriggerInfo
-                    {
-                        Type = TaskTriggerInfoType.IntervalTrigger,
-                        IntervalTicks = TimeSpan.FromMinutes(minutes).Ticks,
-                        MaxRuntimeTicks = TimeSpan.FromMinutes(60).Ticks,
-                    },
-                ];
+                return null;
+            }
+            
+            if (task.LastExecutionResult == null)
+            {
+                return null;
+            }
 
-                if (task.Triggers.Count == 1 &&
-                    task.Triggers.Any(t => t.Type == TaskTriggerInfoType.IntervalTrigger && t.IntervalTicks == newTriggers[0].IntervalTicks))
-                {
-                    return;
-                }
+            DateTimeOffset? lastRun = task.LastExecutionResult.EndTimeUtc;
+            if (!lastRun.HasValue)
+            {
+                return null;
+            }
 
-                LogManager.Warning("Triggers are not default, resetting them");
-                task.Triggers = newTriggers.ToArray();
+            int secondsSinceRan = (int)(DateTimeOffset.UtcNow - lastRun.Value).TotalSeconds;
+            return secondsSinceRan;
+        }
+
+        private IScheduledTaskWorker Task
+        {
+            get
+            {
+                List<IScheduledTaskWorker> tasks = _taskManager.ScheduledTasks
+                    .Where(x => x.ScheduledTask.Key == _key)
+                    .ToList();
+                return tasks.Count > 0 ? tasks[0] : null;
             }
         }
-    }
 
-
-    internal async Task ExecuteJobTaskAsync()
-    {
-        IScheduledTaskWorker task = _taskManager.ScheduledTasks.FirstOrDefault(x => x.ScheduledTask.Key == _key);
-
-        if (task is null)
+        public bool HasTriggers()
         {
-            LogManager.Error($"Cannot execute the task because it was not found (key: {_key})");
-            return;
+            if (Task is null)
+            {
+                LogManager.Error("Can not find task");
+                return false;
+            }
+            TaskTriggerInfo[] triggers = Task.Triggers.ToArray();
+            if (triggers is null || triggers.Length == 0)
+            {
+                LogManager.Info("No triggers found for task");
+                return false;
+            }
+            return true;
         }
 
-        IProgress<double> progress = new Progress<double>();
-        CancellationToken cancellationToken = new();
-        await task.ScheduledTask.ExecuteAsync(progress, cancellationToken);
-
-    }
-
-    public void RemoveAllScheduledJobs()
-    {
-        try
+        public int? GetSecondsUntilNextRun()
         {
-            List<IScheduledTaskWorker> allTasks = _taskManager.ScheduledTasks.ToList();
-
-            if (allTasks.Count == 0)
+            if (Task is null)
             {
-                LogManager.Warning("No tasks found to remove");
+                LogManager.Error("Can not find task");
+                return null;
+            }
+
+            TaskTriggerInfo[] triggers = Task.Triggers.ToArray();
+
+            if (triggers is null || triggers.Length == 0)
+            {
+                return null;
+            }
+
+            if (triggers.Length > 1)
+            {
+                LogManager.Info("Triggers have been customized");
+                return null;
+            }
+
+            TaskTriggerInfo trigger = triggers.First();
+            long? intervalTicks = trigger.IntervalTicks;
+
+            if (!intervalTicks.HasValue)
+            {
+                LogManager.Info("Triggers have been customized, use Reset Schedule button to back to default.");
+                return null;
+            }
+
+            int? lastRan = GetSecondsSinceLastScheduledRun();
+            if (lastRan == null)
+            {
+                return null;
+            }
+
+            int? nextRun = (int)TimeSpan.FromTicks(intervalTicks.Value).TotalSeconds - lastRan;
+            return nextRun;
+        }
+
+        public void ResetToDefault(int minutes)
+        {
+
+            List<TaskTriggerInfo> newTriggers = new List<TaskTriggerInfo>
+            {
+                new TaskTriggerInfo
+                {
+                    Type = TaskTriggerInfoType.IntervalTrigger,
+                    IntervalTicks = TimeSpan.FromMinutes(minutes).Ticks,
+                    MaxRuntimeTicks = TimeSpan.FromMinutes(60).Ticks,
+                }
+            };
+            LogManager.Info("Setting default sync schedule.");
+            Task.Triggers = newTriggers.ToArray();
+
+            return;
+
+        }
+
+        internal async Task ExecuteJobTaskAsync()
+        {
+            IScheduledTaskWorker task = _taskManager.ScheduledTasks.FirstOrDefault(x => x.ScheduledTask.Key == _key);
+
+            if (task is null)
+            {
+                LogManager.Error($"Cannot execute the task because it was not found (key: {_key})");
                 return;
             }
 
-            foreach (IScheduledTaskWorker task in allTasks)
+            IProgress<double> progress = new Progress<double>();
+            CancellationToken cancellationToken = new CancellationToken();
+            await task.ScheduledTask.ExecuteAsync(progress, cancellationToken);
+
+        }
+
+        public void RemoveAllScheduledJobs()
+        {
+            try
             {
-                if (task.ScheduledTask.Key == _key)
+                List<IScheduledTaskWorker> allTasks = _taskManager.ScheduledTasks.ToList();
+
+                if (allTasks.Count == 0)
                 {
-                    task.Triggers = []; 
-                    LogManager.Info($"All triggers for task with key {_key} have been removed.");
+                    LogManager.Warning("No tasks found to remove");
+                    return;
+                }
+
+                foreach (IScheduledTaskWorker task in allTasks)
+                {
+                    if (task.ScheduledTask.Key == _key)
+                    {
+                        task.Triggers = new TaskTriggerInfo[0];
+                        LogManager.Info($"All triggers for task with key {_key} have been removed.");
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                LogManager.Error($"An error occurred while removing scheduled jobs: {ex.Message}");
+            }
         }
-        catch (Exception ex)
-        {
-            LogManager.Error($"An error occurred while removing scheduled jobs: {ex.Message}");
-        }
+
+
+
     }
-
-
-
 }

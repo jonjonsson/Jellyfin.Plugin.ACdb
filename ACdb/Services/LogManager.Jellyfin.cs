@@ -34,7 +34,7 @@ public class EventList // For Emby compatibility
 }
 
 
-internal static class LogManager // For Emby compatibility
+internal static class LogManager
 {
     private static ILogger<Plugin> logging;
     public static EventList EventList = new();

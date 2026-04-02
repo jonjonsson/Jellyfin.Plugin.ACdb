@@ -1,22 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFramework Condition="'$(Configuration)' == 'Debug' or '$(Configuration)' == 'Release'">netstandard2.0</TargetFramework>
+        <TargetFramework Condition="'$(Configuration)' == 'Debug' or '$(Configuration)' == 'Release'">net9.0</TargetFramework>
         <Nullable>disable</Nullable>
         <IsPublishable>True</IsPublishable>
         <ErrorReport>none</ErrorReport>
-        <AssemblyVersion>2.3.1.0</AssemblyVersion>
-        <FileVersion>2.3.1.0</FileVersion>
+        <AssemblyVersion>3.0.0.2</AssemblyVersion>
+        <FileVersion>3.0.0.2</FileVersion>
         <AssemblyInformationalVersion>4.8.0.0</AssemblyInformationalVersion>
         <ProductVersion>4.8.0.0</ProductVersion>
         <Platforms>AnyCPU</Platforms>
         <Configurations>
-			Release;Debug
-		</Configurations>
+		    Release;Debug
+	    </Configurations>
     </PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='Debug'">
 		<DebugType>full</DebugType>
 		<DebugSymbols>true</DebugSymbols>
+		<!-- Sometimes older version or alternative dll was copied to plugin directory on second run when code was not changed. -->
+		<DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
 	</PropertyGroup>
 
 
@@ -62,4 +65,7 @@
 		<AssemblyName>Jellyfin.Plugin.ACdb</AssemblyName>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<PackageReference Include="System.Memory" Version="4.6.3" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+	</ItemGroup>
 </Project>

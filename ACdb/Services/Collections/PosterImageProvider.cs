@@ -13,112 +13,113 @@ using ACdb.Model.Reporting;
 using ACdb.Model.JobResponse;
 
 
-namespace ACdb.Services.Collections;
-
-
-
-
-public class PosterImageProvider : IRemoteImageProvider
+namespace ACdb.Services.Collections
 {
-    public string Name => PluginConfig.Name;
 
-    public async Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
+
+
+    public class PosterImageProvider : IRemoteImageProvider
     {
-        using var httpClient = new HttpClient();
-        try
+        public string Name => PluginConfig.Name;
+
+        public async Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
-            return await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            LogManager.Error($"Error fetching image from {url}: {ex.Message}");
-            return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+            using var httpClient = new HttpClient();
+            try
             {
-                ReasonPhrase = ex.Message
-            };
-        }
-    }
-
-    public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
-    {
-        List<RemoteImageInfo> images = new List<RemoteImageInfo>();
-
-        if (!(item is BoxSet))
-        {
-            return [];
-        }
-
-        string collection_sid = SettingsManager.GetCollectionSidByGuid(item.Id);
-
-        if (string.IsNullOrWhiteSpace(collection_sid))
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Could not lookup ACdb ID for {item.Name}");
-            return [];
-        }
-
-        string imageProviderUrl = string.Format(PluginConfig.ImageProviderUrl, collection_sid) + "/" + Manager.ApiKeyHashed;
-
-        string json;
-        try
-        {
-            json = await Manager.Utils.ApiCon.Get(null, imageProviderUrl, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return [];
-        }
-        catch (Exception ex)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Error fetching collection images from {imageProviderUrl}: {ex}");
-            return [];
-        }
-
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return [];
-        }
-
-        ImagesResponse imagesResponse;
-        try
-        {
-            imagesResponse = JsonManager.DeserializeFromString<ImagesResponse>(json);
-        }
-        catch (Exception e)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Could not parse collection images from {imageProviderUrl}: {e}");
-            return [];
-        }
-
-        if (imagesResponse == null || imagesResponse.images == null)
-        {
-            return [];
-        }
-
-        foreach (ACdbImageInfo image in imagesResponse.images)
-        {
-            if (string.IsNullOrWhiteSpace(image.url) || image.remove == true)
-            {
-                continue;
+                return await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             }
-            images.Add(new RemoteImageInfo
+            catch (Exception ex)
             {
-                Type = image.type,
-                ProviderName = Name,
-                Url = image.url
-            });
+                LogManager.Error($"Error fetching image from {url}: {ex.Message}");
+                return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+                {
+                    ReasonPhrase = ex.Message
+                };
+            }
         }
-        return images.ToArray();
-    }
+
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(BaseItem item, CancellationToken cancellationToken)
+        {
+            List<RemoteImageInfo> images = new List<RemoteImageInfo>();
+
+            if (!(item is BoxSet))
+            {
+                return new List<RemoteImageInfo>();
+            }
+
+            string collection_sid = SettingsManager.GetCollectionSidByGuid(item.Id);
+
+            if (string.IsNullOrWhiteSpace(collection_sid))
+            {
+                LogManager.Log(LogTypeEnum.warning, $"Could not lookup ACdb ID for {item.Name}");
+                return new List<RemoteImageInfo>();
+            }
+
+            string imageProviderUrl = string.Format(PluginConfig.ImageProviderUrl, collection_sid) + "/" + Manager.ApiKeyHashed;
+
+            string json;
+            try
+            {
+                json = await Manager.Utils.ApiCon.Get(null, imageProviderUrl, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new List<RemoteImageInfo>();
+            }
+            catch (Exception ex)
+            {
+                LogManager.LogEvent(LogTypeEnum.error, $"Error fetching collection images from {imageProviderUrl}: {ex}");
+                return new List<RemoteImageInfo>();
+            }
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<RemoteImageInfo>();
+            }
+
+            ImagesResponse imagesResponse;
+            try
+            {
+                imagesResponse = JsonManager.DeserializeFromString<ImagesResponse>(json);
+            }
+            catch (Exception e)
+            {
+                LogManager.LogEvent(LogTypeEnum.error, $"Could not parse collection images from {imageProviderUrl}: {e}");
+                return new List<RemoteImageInfo>();
+            }
+
+            if (imagesResponse == null || imagesResponse.images == null)
+            {
+                return new List<RemoteImageInfo>();
+            }
+
+            foreach (ACdbImageInfo image in imagesResponse.images)
+            {
+                if (string.IsNullOrWhiteSpace(image.url) || image.remove == true)
+                {
+                    continue;
+                }
+                images.Add(new RemoteImageInfo
+                {
+                    Type = image.type,
+                    ProviderName = Name,
+                    Url = image.url
+                });
+            }
+            return images.ToArray();
+        }
 
 
-    public IEnumerable<ImageType> GetSupportedImages(BaseItem item)
-    {
-        return [ImageType.Primary, ImageType.Backdrop];
+        public IEnumerable<ImageType> GetSupportedImages(BaseItem item)
+        {
+            return new[] { ImageType.Primary, ImageType.Backdrop };
+        }
+
+        public bool Supports(BaseItem item)
+        {
+            return item is BoxSet;
+        }
     }
 
-    public bool Supports(BaseItem item)
-    {
-        return item is BoxSet;
-    }
 }
-

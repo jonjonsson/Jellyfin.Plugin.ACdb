@@ -2,67 +2,67 @@ using ACdb.Model.Reporting;
 using System;
 using System.Collections.Generic;
 
-namespace ACdb.Services;
-
-public enum EventType
+namespace ACdb.Services
 {
-    General, // todo next not in use now
-    Progress
-}
-
-public abstract class BaseEventArgs
-{
-    public string Description { get; set; }
-    public string Title { get; set; }
-    public string HyperLink { get; set; }
-
-    public LogTypeEnum LogType { get; set; }
-}
-
-public class ActivityLogEventArgs : BaseEventArgs
-{
-    public double? Progress { get; set; }
-}
-
-public static class EventsManager
-{
-    private static readonly Dictionary<EventType, Action<BaseEventArgs>> eventHandlers = [];
-
-    public static void Initialize() {  }
-
-    public static void RegisterEventHandler(EventType eventType, Action<BaseEventArgs> handler)
+    public enum EventType
     {
-        if (!eventHandlers.ContainsKey(eventType))
-        {
-            eventHandlers[eventType] = handler;
-        }
-        else
-        {
-            eventHandlers[eventType] += handler;
-        }
+        Progress
     }
 
-    public static void UnregisterEventHandler(EventType eventType, Action<BaseEventArgs> handler)
+    public abstract class BaseEventArgs
     {
-        if (eventHandlers.ContainsKey(eventType))
+        public string Description { get; set; }
+        public string Title { get; set; }
+        public string HyperLink { get; set; }
+
+        public LogTypeEnum LogType { get; set; }
+    }
+
+    public class ActivityLogEventArgs : BaseEventArgs
+    {
+        public double? Progress { get; set; }
+    }
+
+    public static class EventsManager
+    {
+        private static readonly Dictionary<EventType, Action<BaseEventArgs>> eventHandlers = new Dictionary<EventType, Action<BaseEventArgs>>();
+
+        public static void Initialize() {  }
+
+        public static void RegisterEventHandler(EventType eventType, Action<BaseEventArgs> handler)
         {
-            eventHandlers[eventType] -= handler;
-            if (eventHandlers[eventType] == null)
+            if (!eventHandlers.ContainsKey(eventType))
             {
-                eventHandlers.Remove(eventType);
+                eventHandlers[eventType] = handler;
+            }
+            else
+            {
+                eventHandlers[eventType] += handler;
             }
         }
-    }
 
-    public static void TriggerEvent(EventType eventType, BaseEventArgs args)
-    {
-        if (eventHandlers.ContainsKey(eventType))
+        public static void UnregisterEventHandler(EventType eventType, Action<BaseEventArgs> handler)
         {
-            eventHandlers[eventType]?.Invoke(args);
+            if (eventHandlers.ContainsKey(eventType))
+            {
+                eventHandlers[eventType] -= handler;
+                if (eventHandlers[eventType] == null)
+                {
+                    eventHandlers.Remove(eventType);
+                }
+            }
         }
-        else
+
+        public static void TriggerEvent(EventType eventType, BaseEventArgs args)
         {
-            LogManager.Warning($"No handlers registered for event '{eventType}'");
+            if (eventHandlers.ContainsKey(eventType))
+            {
+                eventHandlers[eventType]?.Invoke(args);
+            }
+            else
+            {
+                LogManager.Warning($"No handlers registered for event '{eventType}'");
+            }
         }
     }
 }

@@ -3,7 +3,6 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
-using MediaBrowser.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,7 +48,14 @@ public partial class ACdbUtils
         return collections.ToList();
     }
 
-    public List<BaseItem> GetItemsIdsWithImdbIdsBatch(List<string> batch)
+
+    public List<BaseItem> GetItems(IList<Guid> items)
+    {
+        List<string> stringIds = items.Select(id => id.ToString()).ToList();
+        return GetItems(stringIds);
+    }
+
+    public List<BaseItem> GetItemsIdsWithImdbIdsBatch(List<string> batch, Guid[] topParentIdsArray = null)
     {
         HashSet<string> imdbSet = new(batch, StringComparer.OrdinalIgnoreCase);
 
@@ -61,7 +67,17 @@ public partial class ACdbUtils
             HasAnyProviderId = new Dictionary<string, string> { { "Imdb", "" } }
         };
 
+        if (topParentIdsArray != null && topParentIdsArray.Length > 0)
+        {
+        }
+
         IReadOnlyList<BaseItem> items = LibraryManager.QueryItems(query).Items;
+
+        if (topParentIdsArray != null && topParentIdsArray.Length > 0)
+        {
+            var allowedParents = new HashSet<Guid>(topParentIdsArray);
+            items = items.Where(i => i.ParentId != Guid.Empty && allowedParents.Contains(i.ParentId)).ToList();
+        }
 
         return items
             .Where(item => item.ProviderIds != null
@@ -74,35 +90,6 @@ public partial class ACdbUtils
     public void UpdateItem(BaseItem item, ItemUpdateType updateReason)
     {
         LibraryManager.UpdateItemAsync(item, item.GetParent(), updateReason, new CancellationToken());
-    }
-
-    public ItemImageInfo GetImageInfo(BaseItem item, ImageType imageType, int index)
-    {
-        return item.GetImageInfo(imageType, index);
-    }
-
-    public Dictionary<string, string> GetImdbIdsBatch(List<string> batch)
-    {
-        Guid[] batchIds = batch.Select(id => Guid.Parse(id)).ToArray();
-
-        InternalItemsQuery query = new()
-        {
-            ItemIds = batchIds,
-            Recursive = true,
-            IncludeItemTypes = [BaseItemKind.Movie, BaseItemKind.Series],
-        };
-
-        IReadOnlyList<BaseItem> items = LibraryManager.QueryItems(query).Items;
-
-        return items
-            .Where(item => item.ProviderIds != null)
-            .Select(item =>
-            {
-                item.ProviderIds.TryGetValue("imdb", out string imdbId);
-                return new { item.Id, ImdbId = imdbId };
-            })
-            .Where(x => x.ImdbId != null)
-            .ToDictionary(x => x.Id.ToString(), x => x.ImdbId);
     }
 
 

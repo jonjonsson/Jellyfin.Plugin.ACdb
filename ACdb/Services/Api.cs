@@ -3,88 +3,89 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ACdb.Services;
-
-public class Api
+namespace ACdb.Services
 {
-    private static DateTime _lastCallUtc = DateTime.MinValue;
-    private static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(2);
-
-    public async Task<string> Get(string apiKey, string url, CancellationToken cancellationToken)
+    public class Api
     {
-        string json = await WebRequestAPI(url, "GET", null, apiKey, cancellationToken).ConfigureAwait(false);
-        return json;
-    }
+        private static DateTime _lastCallUtc = DateTime.MinValue;
+        private static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(2);
 
-    public async Task<string> Post<T>(string apiKey, T data, string url, CancellationToken cancellationToken)
-    {
-        string jsonData = JsonManager.SerializeToString(data);
-        string response = await WebRequestAPI(url, "POST", jsonData, apiKey, cancellationToken).ConfigureAwait(false);
-        return response;
-    }
-
-    private async Task<string> WebRequestAPI(
-        string url, 
-        string method, 
-        string postData = null, 
-        string secret = null, 
-        CancellationToken cancellationToken = default)
-    {
-
-        var now = DateTime.UtcNow;
-        var sinceLast = now - _lastCallUtc;
-        if (sinceLast < MinInterval)
+        public async Task<string> Get(string apiKey, string url, CancellationToken cancellationToken)
         {
-            var wait = MinInterval - sinceLast;
-            await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+            string json = await WebRequestAPI(url, "GET", null, apiKey, cancellationToken).ConfigureAwait(false);
+            return json;
         }
-        _lastCallUtc = DateTime.UtcNow;
 
-        LogManager.Info($"Sending {method} request to {url}");
-
-        var requestHeaders = new List<Dictionary<string, string>>
+        public async Task<string> Post<T>(string apiKey, T data, string url, CancellationToken cancellationToken)
         {
-            new() { { "Auth", $"Bearer {secret}" } }
-        };
+            string jsonData = JsonManager.SerializeToString(data);
+            string response = await WebRequestAPI(url, "POST", jsonData, apiKey, cancellationToken).ConfigureAwait(false);
+            return response;
+        }
 
-        try
+        private async Task<string> WebRequestAPI(
+            string url, 
+            string method, 
+            string postData = null, 
+            string secret = null, 
+            CancellationToken cancellationToken = default)
         {
-            if (method.Equals("POST", StringComparison.CurrentCultureIgnoreCase))
+
+            var now = DateTime.UtcNow;
+            var sinceLast = now - _lastCallUtc;
+            if (sinceLast < MinInterval)
             {
-                if (string.IsNullOrEmpty(postData))
+                var wait = MinInterval - sinceLast;
+                await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+            }
+            _lastCallUtc = DateTime.UtcNow;
+
+            LogManager.Info($"Sending {method} request to {url}");
+
+            List<Dictionary<string, string>> requestHeaders = new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string>() { { "Auth", $"Bearer {secret}" } }
+            };
+
+            try
+            {
+                if (method.Equals("POST", StringComparison.CurrentCultureIgnoreCase))
                 {
-                    LogManager.Error($"postData is null or empty, cannot make POST request to {url}");
-                    return null;
+                    if (string.IsNullOrEmpty(postData))
+                    {
+                        LogManager.Error($"postData is null or empty, cannot make POST request to {url}");
+                        return null;
+                    }
+
+                    string result = await HttpClientManager.Post(
+                        url,
+                        20000,
+                        requestHeaders,
+                        postData.AsMemory(),
+                        cancellationToken
+                    ).ConfigureAwait(false);
+
+                    LogManager.Info($"Received response: {result}");
+                    return result;
                 }
+                else
+                {
+                    string result = await HttpClientManager.Get(
+                        url,
+                        20000,
+                        requestHeaders,
+                        cancellationToken
+                    ).ConfigureAwait(false);
 
-                string result = await HttpClientManager.Post(
-                    url,
-                    20000,
-                    requestHeaders,
-                    postData.AsMemory(),
-                    cancellationToken
-                ).ConfigureAwait(false);
-
-                LogManager.Info($"Received response: {result}");
-                return result;
+                    LogManager.Info($"Received response: {result}");
+                    return result;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                string result = await HttpClientManager.Get(
-                    url,
-                    20000,
-                    requestHeaders,
-                    cancellationToken
-                ).ConfigureAwait(false);
-
-                LogManager.Info($"Received response: {result}");
-                return result;
+                LogManager.Error($"Error from {url} using method {method} {ex.Message}");
+                return string.Empty;
             }
-        }
-        catch (Exception ex)
-        {
-            LogManager.Error($"Error from {url} using method {method} {ex.Message}");
-            return string.Empty;
         }
     }
 }

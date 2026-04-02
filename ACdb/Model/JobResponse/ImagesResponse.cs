@@ -1,7 +1,7 @@
 #pragma warning disable IDE1006 // Disable naming styles, can't use PascalCase for property names without complicating things (not able to install newtonsoft.json I assume?)
+using System.Text.Json.Serialization;
 using MediaBrowser.Model.Entities;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 
 namespace ACdb.Model.JobResponse
 {

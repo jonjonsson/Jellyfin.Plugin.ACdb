@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -32,7 +33,7 @@ namespace ACdb.Services
                 return;
             }
 
-            List<(string Name, string Id)> allLibraries = GetAll();
+            List<(string Name, string Id)> allLibraries = Manager.Utils.GetAllLibraries();
 
             foreach (LibraryImage libraryImage in librarySync.images)
             {
@@ -55,13 +56,20 @@ namespace ACdb.Services
 
             item.RemoveImages(item.ImageInfos.ToList());
 
+            posterId = string.IsNullOrEmpty(posterId) ? "null" : posterId;
+            string imageProviderUrl = string.Format(PluginConfig.ImageLibraryUrl, posterId, Manager.ApiKeyHashed);
+
             try
             {
-                if (string.IsNullOrEmpty(posterId) == false)
+                if (string.IsNullOrEmpty(posterId))
+                {
+                    _ = Manager.Utils.ApiCon.Get(null, imageProviderUrl, new CancellationToken());
+                }
+                else
                 {
                     item.SetImage(new ItemImageInfo
                     {
-                        Path = string.Format(PluginConfig.ImageLibraryUrl, posterId, Manager.ApiKeyHashed),
+                        Path = imageProviderUrl,
                         Type = ImageType.Primary
                     }, 0);
                 }
@@ -89,7 +97,7 @@ namespace ACdb.Services
             int status = 0;
             try
             {
-                List<string> libraryNames = GetAll().Select(x => x.Name).ToList();
+                List<string> libraryNames = Manager.Utils.GetAllLibraries().Select(x => x.Name).ToList();
                 string json = await Manager.Utils.ApiCon.Post(Manager.ApiKey, libraryNames, PluginConfig.AddLibrariesUrl, CancellationToken.None);
                 Response response = JsonManager.DeserializeFromString<Response>(json);
                 status = response.status;
@@ -104,35 +112,9 @@ namespace ACdb.Services
             }
         }
 
-
-        private List<(string Name, string Id)> GetAll()
-        {
-            var libraries = new List<(string Name, string Id)>();
-
-            if (_libraryManager == null)
-            {
-                return libraries;
-            }
-
-            IReadOnlyList<BaseItem> results = _libraryManager.RootFolder.GetChildren(Manager.Utils.GetAdminUser(), true);
-
-            if (results == null)
-            {
-                return libraries;
-            }
-
-            foreach (BaseItem item in results)
-            {
-                if (item == null) continue;
-                libraries.Add((item.Name, item.Id.ToString()));
-            }
-
-            return libraries;
-        }
-
         private string GetHashed()
         {
-            var names = GetAll()
+            var names = Manager.Utils.GetAllLibraries()
                 .Select(x => x.Name)
                 .OrderBy(name => name);
 

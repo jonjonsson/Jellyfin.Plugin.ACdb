@@ -10,427 +10,412 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace ACdb.Services.Collections;
-
-internal class ProcessCollection
+namespace ACdb.Services.Collections
 {
-    private readonly ILibraryManager _libraryManager;
-    private readonly Report _reporting;
-    private readonly CollectionJobReport _collectionReport;
-    private readonly ACdbUtils _utils;
-    public static event EventHandler<BaseItem> ACdbCollectionCreated;
-    private static DateAddedSorting _dateAddedSorting;
-
-
-    public ProcessCollection(ILibraryManager libraryManager, Report reporting, ACdbUtils utils)
+    internal class ProcessCollection
     {
-        _libraryManager = libraryManager;
-        _reporting = reporting;
-        _collectionReport = new CollectionJobReport();
-        _utils = utils;
-        _dateAddedSorting = new DateAddedSorting(_utils, _libraryManager);
-    }
+        private readonly ILibraryManager _libraryManager;
+        private readonly CollectionJobReport _collectionReport;
+        public static event EventHandler<BoxSet> ACdbCollectionCreated;
+        private static DateAddedSorting _dateAddedSorting;
+        private readonly Response.CollectionJob _collectionRules;
+        private CollectionOperationResult _collectionOperationResult;
 
-    public CollectionJobReport GetCollectionReport()
-    {
-        return _collectionReport;
-    }
 
-    public async Task ProcessCollectionAsync(Response.Collection collection)
-    {
-
-        if (collection is null)
+        public ProcessCollection(ILibraryManager libraryManager, Response.CollectionJob collectionRules)
         {
-            _reporting.AddToLog(LogTypeEnum.error, "Collection sync requested but no collection provided.", _collectionReport);
-            return;
+            _libraryManager = libraryManager;
+            _collectionReport = new CollectionJobReport();
+            _collectionRules = collectionRules;
+            _dateAddedSorting = new DateAddedSorting(_libraryManager);
         }
 
-        _collectionReport.name = collection.name;
-        _collectionReport.cid = collection.cid;
-        _collectionReport.collection_sid = collection.collection_sid;
-
-        if (collection.delete)
+        public CollectionJobReport GetCollectionReport()
         {
-            if (string.IsNullOrEmpty(collection.cid))
+            return _collectionReport;
+        }
+
+        public CollectionOperationResult GetCollectionOperationResult()
+        {
+            return _collectionOperationResult;
+        }
+
+        private Guid[] IncludeLibraries
+        {
+            get
             {
-                LogManager.Error($"Deleting collection request for: {collection.collection_sid} {collection.name} but ID is not available.");
+                if (ExcludedLibraries == null || ExcludedLibraries.Count == 0)
+                {
+                    return null; // Include all libraries
+                }
+
+                var libraries = Manager.Utils.GetAllLibrariesExcluding(ExcludedLibraries);
+                return libraries.Length > 0 ? libraries : null;
+            }
+        }
+
+        private List<string> ExcludedLibraries
+        {
+            get
+            {
+                if (_collectionRules.excluded_libraries == null)
+                {
+                    return new List<string>();
+                }
+                return _collectionRules.excluded_libraries;
+            }
+        }
+
+        public async Task ProcessCollectionAsync()
+        {
+
+            if (_collectionRules is null)
+            {
+                return;
+            }
+
+            _collectionReport.name = _collectionRules.name;
+            _collectionReport.cid = _collectionRules.cid;
+            _collectionReport.collection_sid = _collectionRules.collection_sid;
+            _collectionReport.start_time = DateTime.Now;
+
+            if (_collectionRules.delete)
+            {
+
+                _collectionReport.deleted = true; // Set to true regardless of success so this does not gets sent endlessly to client
+
+                if (string.IsNullOrEmpty(_collectionRules.cid))
+                {
+                    LogManager.Error($"Deleting collection request for: {_collectionRules.collection_sid} {_collectionRules.name} but ID is not available.");
+                    return;
+                }
+
+                try
+                {
+                    DeleteCollection(_collectionRules.cid);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Error($"Error deleting collection: {_collectionRules.name}", new ActivityLogEventArgs { Description = ex.Message });
+                }
+                return;
+            }
+
+            BoxSet collection = null;
+
+            if (_collectionRules.imdb_ids == null)
+            {
+                LogManager.Error($"Error collection.imdb_ids is null in {_collectionRules.collection_sid}");
+                return;
+            }
+
+            if (_collectionRules.imdb_ids.Count > 0)
+            {
+                _dateAddedSorting.ProcessExistingCollections(_collectionRules.collection_sid, _collectionRules.item_sorting);
+
+                LogManager.Info($"IMDB IDs found, syncing collection: {_collectionRules.name}");
+                try
+                {
+                    collection = await CreateOrUpdateAsync(_collectionRules.cid, _collectionRules.name, _collectionRules.collection_sid, _collectionRules.imdb_ids);
+                }
+                catch (Exception ex)
+                {
+                    LogManager.Error($"Error creating or updating collection: {_collectionRules.name}", new ActivityLogEventArgs { Description = ex.Message });
+                }
+            }
+
+            if (collection is null)
+            {
+                SettingsManager.CollectionRemovedCleanup(_collectionRules.collection_sid);
                 return;
             }
 
             try
             {
-                DeleteCollection(collection.cid);
+                UpdateNameDescription(collection, _collectionRules.name, _collectionRules.description);
             }
             catch (Exception ex)
             {
-                _reporting.AddToLog(LogTypeEnum.error, $"Error deleting collection: {collection.name}", _collectionReport, new ActivityLogEventArgs { Description = ex.Message });
-                LogManager.Error($"Error deleting collection: {collection.name}: ex.Message");
+                LogManager.Error($"Error updating name or description for collection: {_collectionRules.name}", new ActivityLogEventArgs { Description = ex.Message });
             }
-            return;
-        }
 
-        Guid? collectionId = null;
-
-        if (collection.imdb_ids == null)
-        {
-            LogManager.Error($"Error collection.imdb_ids is null in {collection.collection_sid}");
-            return;
-        }
-
-        if (collection.imdb_ids.Count > 0)
-        {
-            _dateAddedSorting.ProcessExistingCollections(collection.collection_sid, collection.item_sorting);
-
-            LogManager.Info($"IMDB IDs found, syncing collection: {collection.name}");
             try
             {
-                collectionId = await CreateOrUpdateAsync(collection.cid, collection.name, collection.collection_sid, collection.imdb_ids);
+                bool updatedCollectionSortName = await UpdateCollectionSortNameAsync(collection, _collectionRules.sort_name, _collectionRules.sort_to_top);
+                if (updatedCollectionSortName)
+                {
+                    LogManager.Info($"Updated sort name for collection: {_collectionRules.name}");
+                }
             }
             catch (Exception ex)
             {
-                _reporting.AddToLog(LogTypeEnum.error, $"Error creating or updating collection: {collection.name}", _collectionReport, new ActivityLogEventArgs { Description = ex.Message });
-                LogManager.Error($"Error creating or updating collection: {collection.name}: {ex.Message}");
+                LogManager.Error($"Error updating sort name for collection: {_collectionRules.name}", new ActivityLogEventArgs { Description = ex.Message });
+            }
+
+            HandleItemDisplayOrder(collection, _collectionRules.item_sorting);
+
+            if (_collectionRules.set_poster == true)
+            {
+                Manager.FetchImages.Add(collection);
             }
         }
 
-        if (!collectionId.HasValue)
+        private void HandleItemDisplayOrder(BoxSet collection, ItemSorting? itemSorting)
         {
-            SettingsManager.CollectionRemovedCleanup(collection.collection_sid);
-            return;
-        }
-
-        BoxSet collectionItem = _libraryManager.GetItemById(collectionId.Value.ToString()) as BoxSet;
-
-        try
-        {
-            UpdateNameDescription(collectionItem, collection.name, collection.description);
-        }
-        catch (Exception ex)
-        {
-            _reporting.AddToLog(LogTypeEnum.error, $"Error updating name or description for collection: {collection.name}", _collectionReport, new ActivityLogEventArgs { Description = ex.Message });
-            LogManager.Error($"Error updating name or description for collection: {collection.name}: {ex.Message}");
-        }
-
-        try
-        {
-            bool updatedCollectionSortName = await UpdateCollectionSortNameAsync(collectionItem, collection.sort_name, collection.sort_to_top);
-            if (updatedCollectionSortName)
+            if (itemSorting == null || itemSorting == ItemSorting.None)
             {
-                LogManager.Info($"Updated sort name for collection: {collection.name}");
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            _reporting.AddToLog(LogTypeEnum.error, $"Error updating sort name for collection: {collection.name}", _collectionReport, new ActivityLogEventArgs { Description = ex.Message });
-            LogManager.Error($"Error updating sort name for collection: {collection.name}: {ex.Message}");
-        }
 
-        HandleItemDisplayOrder(collectionItem, collection.item_sorting);
-
-        if (collection.set_poster == true)
-        {
-            Manager.FetchImages.Add(collectionItem);
-        }
-    }
-
-
-    private void HandleItemDisplayOrder(BoxSet collection, ItemSorting? itemSorting)
-    {
-        if (itemSorting == null || itemSorting == ItemSorting.None)
-        {
-            return;
-        }
-
-        ItemSortBy displayOrder;
-        if (itemSorting == ItemSorting.PremierDate)
-        {
-            displayOrder = ItemSortBy.PremiereDate;
-        }
-        else
-        {
-            displayOrder = ItemSortBy.SortName;
-        }
-        collection.DisplayOrder = displayOrder.ToString();
-        _utils.UpdateItem(collection, ItemUpdateType.MetadataEdit);
-    }
-
-    private bool DeleteCollection(string collectionID)
-    {
-        BaseItem collectionItem = _libraryManager.GetItemById(collectionID);
-        _collectionReport.deleted = true;
-
-        if (collectionItem == null || collectionItem.GetType() != typeof(BoxSet))
-        {
-            string errorMessage = collectionItem == null
-                ? "Collection sync requested to delete a collection that does not exist."
-                : "Collection sync requested to delete a collection but collection ID provided is not a collection, can not process collection.";
-            _reporting.AddToLog(LogTypeEnum.error, errorMessage, _collectionReport);
-            return false;
-        }
-
-        try
-        {
-            LogManager.LogEvent(LogTypeEnum.info, $"Deleting collection: {collectionItem.Name}");
-
-            var deleteOptions = new DeleteOptions
+            ItemSortBy displayOrder;
+            if (itemSorting == ItemSorting.PremierDate)
             {
-            };
-            _libraryManager.DeleteItem(collectionItem, deleteOptions);
-
-            if (_libraryManager.GetItemById(collectionID.ToString()) != null)
+                displayOrder = ItemSortBy.PremiereDate;
+            }
+            else
             {
-                _reporting.AddToLog(LogTypeEnum.error, "Collection sync requested to delete a collection but it was unsuccessful.", _collectionReport);
+                displayOrder = ItemSortBy.SortName;
+            }
+            collection.DisplayOrder = displayOrder.ToString();
+            Manager.Utils.UpdateItem(collection, ItemUpdateType.MetadataEdit);
+        }
+
+        private bool DeleteCollection(string collectionID)
+        {
+            BaseItem collectionItem = _libraryManager.GetItemById(collectionID);
+
+            if (collectionItem == null || collectionItem.GetType() != typeof(BoxSet))
+            {
+                string errorMessage = collectionItem == null
+                    ? "Collection sync requested to delete a collection that does not exist."
+                    : "Collection sync requested to delete a collection but collection ID provided is not a collection, can not process collection.";
+                LogManager.LogEvent(LogTypeEnum.error, errorMessage);
                 return false;
             }
 
-            return true;
-        }
-        catch (Exception e)
-        {
-            _reporting.AddToLog(LogTypeEnum.error, $"Error deleting collection", _collectionReport, new ActivityLogEventArgs { Description = e.Message });
-            return false;
-        }
-    }
-
-
-    private async Task<Guid?> CreateOrUpdateAsync(string collectionID, string name, string collection_sid, List<string> imdbIDs)
-    {
-        if (string.IsNullOrEmpty(collectionID) && string.IsNullOrEmpty(name))
-        {
-            _reporting.AddToLog(LogTypeEnum.error, "Collection sync requested but no collection ID or name provided, can not process collection.", _collectionReport);
-            _collectionReport.paused = true;
-            return null;
-        }
-
-        imdbIDs = imdbIDs.Distinct().ToList();
-
-        collectionID = ValidateExistingCollection(collectionID, name);
-
-        if (string.IsNullOrEmpty(collectionID))
-        {
-            Dictionary<string, string> allCollectionNames = _utils.AllCollectionNames();
-
-            if (!allCollectionNames.ContainsValue(name))
+            try
             {
-                BaseItem item = await CreateCollectionFromImdbsAsync(name, imdbIDs, collection_sid);
-                if (item == null)
+                LogManager.LogEvent(LogTypeEnum.info, $"Deleting collection: {collectionItem.Name}");
+
+                var deleteOptions = new DeleteOptions
                 {
-                    return null;
+                };
+                _libraryManager.DeleteItem(collectionItem, deleteOptions);
+
+                if (_libraryManager.GetItemById(collectionID.ToString()) != null)
+                {
+                    return false;
                 }
-                Manager.FetchImages.Add(item);
-                return item.Id;
+
+                return true;
             }
-
-            _reporting.AddToLog(LogTypeEnum.info, $"Collection {name} already exists. Will merge.", _collectionReport, new ActivityLogEventArgs { Description = "Job asked to create collection but a collection with the same name already exists." });
-            collectionID = allCollectionNames.FirstOrDefault(x => x.Value == name).Key;
-        }
-
-        if (string.IsNullOrEmpty(collectionID))
-        {
-            _reporting.AddToLog(LogTypeEnum.error, "Collection ID is null after attempting to find or create collection.", _collectionReport);
-            return null;
-        }
-
-        BaseItem collectionItem = _libraryManager.GetItemById(collectionID);
-        if (collectionItem is BoxSet collection)
-        {
-            SettingsManager.AddCollectionSidToGuid(collection_sid, collection.Id);
-            return await UpdateCollectionAsync(collection, imdbIDs);
-        }
-
-        _reporting.AddToLog(LogTypeEnum.error, $"Collection ID {collectionID} is not a BoxSet, cannot process collection.", _collectionReport);
-        return null;
-    }
-
-    private static int RemoveRedunantImdbIdsFromCollection(BaseItem collection, Dictionary<string, string> ImdbIdsInCollection, List<string> listImdbIds)
-    {
-        int removed = 0;
-        List<string> itemsToRemoveFromCollection = [];
-        foreach (KeyValuePair<string, string> itemAndImdb in ImdbIdsInCollection)
-        {
-            if (listImdbIds.Contains(itemAndImdb.Value) is false)
+            catch (Exception e)
             {
-                itemsToRemoveFromCollection.Add(itemAndImdb.Key);
-                removed++;
+                LogManager.LogEvent(LogTypeEnum.error, $"Error deleting collection", new ActivityLogEventArgs { Description = e.Message });
+                return false;
             }
         }
-        CollectionManager.RemoveFromCollection(collection, itemsToRemoveFromCollection);
-        return removed;
-    }
-
-    private async Task<CollectionOperationResult> AddImdbIdsToCollectionAsync(Guid collectionGuid, List<string> ImdbIds)
-    {
-        CollectionOperationResult result = new();
-        if (ImdbIds is null || ImdbIds.Count == 0)
-            return result;
-        result = _utils.GetItemsIdsWithImdbIds(ImdbIds);
-        BaseItem collection = _libraryManager.GetItemById(collectionGuid);
-        await CollectionManager.AddToCollectionAsync(collection, result.FoundItemIds);
-        return result;
-    }
 
 
-    private async Task<BaseItem> CreateCollectionFromImdbsAsync(string name, List<string> listImdbIds, string collection_sid)
-    {
-        if (string.IsNullOrEmpty(name))
+        private async Task<BoxSet> CreateOrUpdateAsync(string collectionID, string name, string collection_sid, List<string> imdbIDs)
         {
-            _reporting.AddToLog(LogTypeEnum.error, "No collection name provided, can't create collection without name", _collectionReport);
-            return null;
-        }
-
-        try
-        {
-            CollectionOperationResult getItemsWithImdbResult = _utils.GetItemsIdsWithImdbIds(listImdbIds);
-
-            if (getItemsWithImdbResult.FoundCount == 0)
+            if (string.IsNullOrEmpty(collectionID) && string.IsNullOrEmpty(name))
             {
-                _reporting.AddToLog(LogTypeEnum.error, "Can't create collection as you do not own any of the items.", _collectionReport);
+                LogManager.LogEvent(LogTypeEnum.error, $"Collection sync requested but no collection ID or name provided, can not process collection.", new ActivityLogEventArgs { Description = $"Collection SID: {collection_sid}" });
+                _collectionReport.paused = true;
                 return null;
             }
 
-            LogManager.LogEvent(LogTypeEnum.info, $"Creating {name}", new ActivityLogEventArgs { Description = $"Collections contains {listImdbIds.Count} items." });
-            BaseItem newCollection = await CollectionManager.CreateCollectionAsync(name, getItemsWithImdbResult.FoundItemIds);
-            SettingsManager.AddCollectionSidToGuid(collection_sid, newCollection.Id);
-            ACdbCollectionCreated?.Invoke(this, newCollection);
+            imdbIDs = imdbIDs.Distinct().ToList();
 
-            string url = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}";
-            LogManager.LogEvent(LogTypeEnum.info, $"Created collection: {name}", new ActivityLogEventArgs { Description = $"Added: {getItemsWithImdbResult.FoundCount}. Missing: {getItemsWithImdbResult.MissingImdbIds.Count}. Click to visit on {PluginConfig.WebSiteUrl}", HyperLink = url });
+            collectionID = ValidateExistingCollection(collectionID, name);
 
-            _collectionReport.is_new = true;
-            _collectionReport.added_count = getItemsWithImdbResult.FoundCount;
-            _collectionReport.cid = newCollection.Id.ToString();
-            _collectionReport.missing_imdbs = getItemsWithImdbResult.MissingImdbIds;
-            return newCollection;
-        }
-        catch (Exception e)
-        {
-            _reporting.AddToLog(LogTypeEnum.error, $"Error creating collection", _collectionReport, new ActivityLogEventArgs { Description = e.Message });
+            if (string.IsNullOrEmpty(collectionID))
+            {
+                Dictionary<string, string> allCollectionNames = Manager.Utils.AllCollectionNames();
+
+                if (!allCollectionNames.ContainsValue(name))
+                {
+                    BoxSet item = await UpdateCollectionAsync(imdbIDs);
+                    if (item == null)
+                    {
+                        return null;
+                    }
+                    Manager.FetchImages.Add(item);
+                    return item;
+                }
+
+                LogManager.LogEvent(LogTypeEnum.info, $"Collection {name} already exists. Will merge.");
+                collectionID = allCollectionNames.FirstOrDefault(x => x.Value == name).Key;
+            }
+
+            if (string.IsNullOrEmpty(collectionID))
+            {
+                LogManager.LogEvent(LogTypeEnum.error, "Collection ID is null after attempting to find or create collection.");
+                return null;
+            }
+
+            var collectionItem = _libraryManager.GetItemById(collectionID);
+            if (collectionItem is BoxSet collection)
+            {
+                SettingsManager.AddCollectionSidToGuid(collection_sid, collection.Id);
+                return await UpdateCollectionAsync(imdbIDs, collection);
+            }
+
+            LogManager.LogEvent(LogTypeEnum.error, $"Collection ID {collectionID} is not a BoxSet, cannot process collection.");
             return null;
         }
-    }
 
-    private async Task<Guid?> UpdateCollectionAsync(BoxSet collection, List<string> listImdbIds)
-    {
-        try
+
+        private async Task<BoxSet> UpdateCollectionAsync(List<string> listImdbIds, BoxSet collection = null)
         {
-            List<string> itemsIdsInCollection = _utils.GetItemIdsInCollection(collection);
-            Dictionary<string, string> ImdbIdsInCollection = _utils.GetImdbIds(itemsIdsInCollection);
-            List<string> ImdbIdsInCollectionList = ImdbIdsInCollection.Values.ToList();
-            List<string> ImdbIdsToAdd = listImdbIds.Except(ImdbIdsInCollectionList).ToList();
+            try
+            {
+                int removeCount = 0;
+                _collectionOperationResult = Manager.Utils.GetItemsIdsWithImdbIds(listImdbIds, IncludeLibraries);
+                _collectionReport.missing_imdbs = _collectionOperationResult.MissingImdbIds;
+                List<BaseItem> itemsToAdd = Manager.Utils.ApplyLimiting(_collectionOperationResult.FoundItems, _collectionRules.limit, _collectionRules.limit_type);
+                List<string> itemIDsToAdd = Manager.Utils.GetItemIds(itemsToAdd);
 
-            int removedCount = RemoveRedunantImdbIdsFromCollection(collection, ImdbIdsInCollection, listImdbIds);
+                if (collection is null)
+                {
+                    _collectionReport.is_new = true;
+                    if (itemsToAdd.Count == 0)
+                    {
+                        LogManager.LogEvent(LogTypeEnum.warning, $"Can't create {_collectionReport.name} as you do not own any of the items.", new ActivityLogEventArgs { Description = $"Click to view.", HyperLink = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}" });
+                        return null;
+                    }
+                    else
+                    {
+                        collection = await CollectionManager.CreateCollectionAsync(_collectionReport.name, itemIDsToAdd) as BoxSet;
+                        SettingsManager.AddCollectionSidToGuid(_collectionReport.collection_sid, collection.Id);
+                        ACdbCollectionCreated?.Invoke(this, collection);
+                        _collectionReport.added_count = itemIDsToAdd.Count;
+                        _collectionReport.cid = collection.Id.ToString();
+                    }
+                }
+                else
+                {
+                    _collectionReport.is_new = false;
+                    List<string> itemsInCollectionBefore = Manager.Utils.GetItemIdsInCollection(collection);
+                    List<string> itemsToAddIds = Manager.Utils.GetItemIdsExcept(itemsToAdd, itemsInCollectionBefore);
+                    List<string> itemsToRemove = itemsInCollectionBefore.Except(itemIDsToAdd).ToList();
+                    removeCount = itemsToRemove.Count;
+                    await CollectionManager.AddToCollectionAsync(collection, itemsToAddIds); // It's important to add items before removing items. Or else when adding random items, and not the same random items get added the collection cleanup event is triggered
+                    CollectionManager.RemoveFromCollection(collection, itemsToRemove); // Must be after Adding Items.
+                    _collectionReport.added_count = itemsToAddIds.Count;
+                    _collectionReport.cid = collection.Id.ToString();
+                }
 
-            CollectionOperationResult addImdbIdsResult = await AddImdbIdsToCollectionAsync(collection.Id, ImdbIdsToAdd);
-            _collectionReport.cid = collection.Id.ToString();
-            _collectionReport.is_new = false;
-            _collectionReport.added_count = addImdbIdsResult.FoundImdbIds.Count;
-            _collectionReport.removed_count = removedCount;
-            _collectionReport.missing_imdbs = addImdbIdsResult.MissingImdbIds;
-            LogManager.LogEvent(LogTypeEnum.info, $"Synced: {collection.Name}", new ActivityLogEventArgs { Description = $"Added: {addImdbIdsResult.FoundImdbIds.Count}. Removed: {removedCount}. Missing: {addImdbIdsResult.MissingImdbIds.Count}. Click to view", HyperLink = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}" });
-            return collection.Id;
-        }
-        catch (Exception e)
-        {
-            _reporting.AddToLog(LogTypeEnum.error, $"Error updating collection", _collectionReport, new ActivityLogEventArgs { Description = e.Message });
-            return collection.Id;
-        }
-
-    }
-
-    private bool UpdateNameDescription(BoxSet collectionItem, string name, string description)
-    {
-        if (collectionItem.Overview == description && collectionItem.Name == name)
-        {
-            return true;
-        }
-
-        collectionItem.Overview = description;
-        collectionItem.Name = name;
-
-        if (collectionItem.IsLocked)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"{collectionItem.Name} is locked, can't update name and/or description for {name}", new ActivityLogEventArgs { });
-            return false;
-        }
-
-        try
-        {
-            _utils.UpdateItem(collectionItem, ItemUpdateType.None);
-            LogManager.LogEvent(LogTypeEnum.info, $"Updated name and/or description for collection: {name}", new ActivityLogEventArgs { Description = description });
-            return true;
-        }
-        catch (Exception e)
-        {
-            LogManager.LogEvent(LogTypeEnum.error, $"Error updating name and/or description for collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = e.Message });
-            return false;
-        }
-    }
-
-    private async Task<bool> UpdateCollectionSortNameAsync(BoxSet collectionItem, string sortName, bool? sort_to_top)
-    {
-        string existingSortName = collectionItem.SortName;
-        string newSortName = null;
-
-        if (sort_to_top == null && sortName == null)
-        {
-            return true;
+                _collectionReport.removed_count = removeCount;
+                LogManager.LogEvent(LogTypeEnum.info, $"Synced: {_collectionRules.name}", new ActivityLogEventArgs { Description = $"Added: {_collectionReport.added_count}. Removed: {removeCount}. Missing: {_collectionOperationResult.MissingImdbIds.Count}. Click to view", HyperLink = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}" });
+            }
+            catch (Exception e)
+            {
+                LogManager.LogEvent(LogTypeEnum.error, $"Error updating collection", new ActivityLogEventArgs { Description = e.Message });
+                return collection;
+            }
+            return collection;
         }
 
-        if (sort_to_top == true)
+        private bool UpdateNameDescription(BoxSet collectionItem, string name, string description)
         {
-            if (_collectionReport.added_count == 0)
+            if (collectionItem.Overview == description && collectionItem.Name == name)
             {
                 return true;
             }
-            newSortName = SortingUtils.GetSortToTopSortName(collectionItem.Name);
-            LogManager.LogEvent(LogTypeEnum.info, $"Moving {collectionItem.Name} to the top of collections", new ActivityLogEventArgs { Description = $"Click to configure.", HyperLink = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}" });
+
+            collectionItem.Overview = description;
+            collectionItem.Name = name;
+
+            if (collectionItem.IsLocked)
+            {
+                LogManager.LogEvent(LogTypeEnum.error, $"{collectionItem.Name} is locked, can't update name and/or description for {name}", new ActivityLogEventArgs { });
+                return false;
+            }
+
+            try
+            {
+                Manager.Utils.UpdateItem(collectionItem, ItemUpdateType.None);
+                LogManager.LogEvent(LogTypeEnum.info, $"Updated name and/or description for collection: {name}", new ActivityLogEventArgs { Description = description });
+                return true;
+            }
+            catch (Exception e)
+            {
+                LogManager.LogEvent(LogTypeEnum.error, $"Error updating name and/or description for collection: {collectionItem.Name}", new ActivityLogEventArgs { Description = e.Message });
+                return false;
+            }
         }
-        else if (sort_to_top == false) // Sort name was reset
+
+        private async Task<bool> UpdateCollectionSortNameAsync(BoxSet collectionItem, string sortName, bool? sort_to_top)
         {
-            newSortName = SortingUtils.GetDefaultSortName(collectionItem.Name);
+            string existingSortName = collectionItem.SortName;
+            string newSortName = null;
+
+            if (sort_to_top == null && sortName == null)
+            {
+                return true;
+            }
+
+            if (sort_to_top == true)
+            {
+                if (_collectionReport.added_count == 0)
+                {
+                    return true;
+                }
+                newSortName = SortingUtils.GetSortToTopSortName(collectionItem.Name);
+                LogManager.LogEvent(LogTypeEnum.info, $"Moving {collectionItem.Name} to the top of collections", new ActivityLogEventArgs { Description = $"Click to configure.", HyperLink = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}" });
+            }
+            else if (sort_to_top == false) // Sort name was reset
+            {
+                newSortName = SortingUtils.GetDefaultSortName(collectionItem.Name);
+            }
+            else if (sortName != null)
+            {
+                newSortName = sortName;
+            }
+
+            if (newSortName == null || existingSortName == newSortName)
+            {
+                return true;
+            }
+
+            await Task.Delay(2000);
+            return Manager.Utils.SetSortName(collectionItem, newSortName);
         }
-        else if (sortName != null)
+
+
+        private string ValidateExistingCollection(string collectionID, string name)
         {
-            newSortName = sortName;
-        }
+            if (string.IsNullOrEmpty(collectionID))
+                return collectionID;
 
-        if (newSortName == null || existingSortName == newSortName)
-        {
-            return true;
-        }
+            BaseItem existingCollection = null;
+            try
+            {
+                existingCollection = _libraryManager.GetItemById(collectionID);
+            }
+            catch (Exception)
+            {
+                LogManager.LogEvent(LogTypeEnum.warning, $"Collection ID not valid format, user may be moving from Emby to Jellyfin. Collection will be re-created.");
+            }
 
-        await Task.Delay(2000);
-        return _utils.SetSortName(collectionItem, newSortName);
-    }
+            string url = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}";
 
+            if (existingCollection == null)
+            {
+                LogManager.LogEvent(LogTypeEnum.info, $"Collection {name} was not found. It will be recreated.", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
+                return null;
+            }
 
-    private string ValidateExistingCollection(string collectionID, string name)
-    {
-        if (string.IsNullOrEmpty(collectionID))
+            if (existingCollection.GetType() != typeof(BoxSet))
+            {
+                LogManager.LogEvent(LogTypeEnum.warning, $"Collection ID for {name} was found but it's not a Collection. It will be recreated.", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
+                return null;
+            }
+
             return collectionID;
-        BaseItem existingCollection = null;
-        try
-        {
-            existingCollection = _libraryManager.GetItemById(collectionID);
         }
-        catch (Exception)
-        {
-            LogManager.LogEvent(LogTypeEnum.warning, $"Collection ID not valid format, user may be moving from Emby to Jellyfin. Collection will be re-created.");
-        }
-
-        string url = $"{PluginConfig.CollectionIdUrl}{_collectionReport.collection_sid}";
-        if (existingCollection == null)
-        {
-            LogManager.LogEvent(LogTypeEnum.info, $"Collection {name} was not found. It will be recreated", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
-            return null;
-        }
-
-        if (existingCollection.GetType() != typeof(BoxSet))
-        {
-            LogManager.LogEvent(LogTypeEnum.warning, $"Collection ID for {name} was found but it's not a Collection. It will be recreated", new ActivityLogEventArgs { Description = $"Click {url} to pause or delete it.", HyperLink = url });
-            return null;
-        }
-        return collectionID;
     }
-}
 
+}
