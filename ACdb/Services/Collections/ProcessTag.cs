@@ -1,3 +1,4 @@
+using ACdb.Model;
 using ACdb.Model.JobResponse;
 using ACdb.Model.Reporting;
 using ACdb.Settings;

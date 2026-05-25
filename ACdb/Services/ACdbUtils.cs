@@ -10,28 +10,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ACdb.Model.Reporting;
 using ACdb.Model.JobResponse;
+using ACdb.Model;
 
 
 namespace ACdb.Services
 {
-    public class CollectionOperationResult
-    {
-        public List<string> MissingImdbIds { get; set; }
-        public List<string> FoundImdbIds { get; set; }
-        public List<string> FoundItemIds { get; set; }
-        public List<BaseItem> FoundItems { get; set; }
-
-        public CollectionOperationResult()
-        {
-            MissingImdbIds = new List<string>();
-            FoundImdbIds = new List<string>();
-            FoundItemIds = new List<string>();
-            FoundItems = new List<BaseItem>();
-        }
-    }
-
 
     public partial class ACdbUtils
     {
@@ -50,7 +34,7 @@ namespace ACdb.Services
 
             MetadataRefreshOptionsParam = directoryService;
 
-            IEnumerable<User> users = userManager.Users;
+            IEnumerable<User> users = userManager.GetUsers();
             _adminUser = users.FirstOrDefault(u => u.HasPermission(PermissionKind.IsAdministrator));
         }
 

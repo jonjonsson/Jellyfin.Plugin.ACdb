@@ -2,9 +2,9 @@
 name: "ACdb.tv"
 guid: "06411f7c-08f6-41da-9e2a-a79b56144845"
 # TODO BUILD Should be same as project version
-version: "3.0.0.2"
+version: "3.0.0.3"
 # TODO BUILD update target version
-targetAbi: "10.11.0"
+targetAbi: "10.11.10"
 # TODO BUILD update framework
 framework: "net9.0"
 overview: "Synchronize Collections from ACdb.tv"
@@ -17,5 +17,5 @@ artifacts:
 - "Jellyfin.Plugin.ACdb.dll"
 # TODO BUILD update changelog
 changelog: >
-  This version of the plugin requires Jellyfin version 10.11.x. Added support for tagging, limiting and library exclusion.
+  Required update for Jellyfin 10.11.10. Does not work for versions prior to 10.11.10.
 image: "ACdb\\Jellyfin.Plugin.ACdb.jpg"

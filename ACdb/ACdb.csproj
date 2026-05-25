@@ -5,8 +5,8 @@
         <Nullable>disable</Nullable>
         <IsPublishable>True</IsPublishable>
         <ErrorReport>none</ErrorReport>
-        <AssemblyVersion>3.0.0.2</AssemblyVersion>
-        <FileVersion>3.0.0.2</FileVersion>
+        <AssemblyVersion>3.0.0.3</AssemblyVersion>
+        <FileVersion>3.0.0.3</FileVersion>
         <AssemblyInformationalVersion>4.8.0.0</AssemblyInformationalVersion>
         <ProductVersion>4.8.0.0</ProductVersion>
         <Platforms>AnyCPU</Platforms>
@@ -37,8 +37,8 @@
 	</PropertyGroup>
 	
     <ItemGroup>
-        <PackageReference Include="Jellyfin.Controller" Version="10.11.0" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
-        <PackageReference Include="Jellyfin.Model" Version="10.11.0" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+        <PackageReference Include="Jellyfin.Controller" Version="10.11.10" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
+        <PackageReference Include="Jellyfin.Model" Version="10.11.10" Condition="'$(Configuration)'=='Debug' or '$(Configuration)'=='Release'" />
     </ItemGroup>
 	
     <ItemGroup>

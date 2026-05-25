@@ -41,6 +41,7 @@ For **Emby** installation, please use the Emby plugin catalog. [More information
 
 - **Free to Start:**  
   Get started with 3 collections for free. [Upgrade](https://www.patreon.com/c/acdbtv) from $2 a month.
+- Adding Library posters from ACdb.tv to your server is free for everyone.
 
 - **Always Up to Date:**  
   Collections update automatically every couple of hours.
@@ -62,6 +63,7 @@ For **Emby** installation, please use the Emby plugin catalog. [More information
 ## Community & Support
 
 - For help, questions, or feedback, [ACdb.tv Contact Page](https://acdb.tv/contact)
+- Also see FAQ for Jellyfin issues if using version 10.11.X: https://acdb.tv/wiki/faq/jellyfin-issues 
 - Join us on [Discord](https://discord.gg/9kWgmGwg5e), for all of the above. New collections and posters are announced there as well.
 
 ## License
