@@ -165,7 +165,9 @@ namespace ACdb.Services
 
             Guid[] topParentIdsArray = allowedTopParentIds ?? Array.Empty<Guid>();
 
-            const int batchSize = 500;
+            int batchSize = 500;
+            batchSize = ImdbIds.Count; // Jellyfin has to query all items in db and then filter in memory, thus it does not make sense to do it in batches.
+
             List<string> allItemIds = new List<string>();
 
             for (int i = 0; i < ImdbIds.Count; i += batchSize)

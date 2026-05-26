@@ -2,7 +2,7 @@
 name: "ACdb.tv"
 guid: "06411f7c-08f6-41da-9e2a-a79b56144845"
 # TODO BUILD Should be same as project version
-version: "3.0.0.3"
+version: "3.0.0.4"
 # TODO BUILD update target version
 targetAbi: "10.11.10"
 # TODO BUILD update framework
@@ -17,5 +17,5 @@ artifacts:
 - "Jellyfin.Plugin.ACdb.dll"
 # TODO BUILD update changelog
 changelog: >
-  Required update for Jellyfin 10.11.10. Does not work for versions prior to 10.11.10.
+  Required update for Jellyfin 10.11.10. Fix for excluding libraries. Improved performance with large collections.
 image: "ACdb\\Jellyfin.Plugin.ACdb.jpg"

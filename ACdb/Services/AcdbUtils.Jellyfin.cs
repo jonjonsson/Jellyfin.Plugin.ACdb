@@ -3,6 +3,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -55,33 +56,28 @@ public partial class ACdbUtils
         return GetItems(stringIds);
     }
 
-    public List<BaseItem> GetItemsIdsWithImdbIdsBatch(List<string> batch, Guid[] topParentIdsArray = null)
+    public List<BaseItem> GetItemsIdsWithImdbIdsBatch(List<string> findImdbIds, Guid[] topParentIdsArray = null)
     {
-        HashSet<string> imdbSet = new(batch, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> imdbSet = new(findImdbIds, StringComparer.OrdinalIgnoreCase);
 
         InternalItemsQuery query = new()
         {
             IncludeItemTypes = [BaseItemKind.Movie, BaseItemKind.Series],
             Recursive = true,
             IsVirtualItem = false,
-            HasAnyProviderId = new Dictionary<string, string> { { "Imdb", "" } }
+            HasAnyProviderId = new Dictionary<string, string> { { MetadataProvider.Imdb.ToString(), "" } }
         };
 
-        if (topParentIdsArray != null && topParentIdsArray.Length > 0)
+        if (topParentIdsArray is { Length: > 0 })
         {
+            query.AncestorIds = topParentIdsArray;
         }
 
         IReadOnlyList<BaseItem> items = LibraryManager.QueryItems(query).Items;
 
-        if (topParentIdsArray != null && topParentIdsArray.Length > 0)
-        {
-            var allowedParents = new HashSet<Guid>(topParentIdsArray);
-            items = items.Where(i => i.ParentId != Guid.Empty && allowedParents.Contains(i.ParentId)).ToList();
-        }
-
         return items
             .Where(item => item.ProviderIds != null
-                && item.ProviderIds.TryGetValue("Imdb", out string imdbId)
+                && item.ProviderIds.TryGetValue(MetadataProvider.Imdb.ToString(), out string imdbId)
                 && imdbSet.Contains(imdbId))
             .ToList();
     }
