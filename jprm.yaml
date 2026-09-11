@@ -2,20 +2,19 @@
 name: "ACdb.tv"
 guid: "06411f7c-08f6-41da-9e2a-a79b56144845"
 # TODO BUILD Should be same as project version
-version: "3.0.0.4"
+version: "3.0.1.0"
 # TODO BUILD update target version
-targetAbi: "10.11.10"
+targetAbi: "12.0.0"
 # TODO BUILD update framework
-framework: "net9.0"
-overview: "Synchronize Collections from ACdb.tv"
+framework: "net10.0"
+overview: "Synchronize Collections and Library Images from ACdb.tv"
 description: >
-  Add dynamic, auto-updating collections of movies and
-  TV shows from ACdb.tv. Visit ACdb.tv for a quick overview.
+  Browse collections on ACdb.tv and add them with one click. Visit ACdb.tv for a quick overview.
 category: "General"
 owner: "jonjonsson"
 artifacts:
 - "Jellyfin.Plugin.ACdb.dll"
 # TODO BUILD update changelog
 changelog: >
-  Required update for Jellyfin 10.11.10. Fix for excluding libraries. Improved performance with large collections.
+  Required update for Jellyfin 12.
 image: "ACdb\\Jellyfin.Plugin.ACdb.jpg"

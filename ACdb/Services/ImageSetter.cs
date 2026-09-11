@@ -37,7 +37,7 @@ namespace ACdb.Services
             string json = await Manager.Utils.ApiCon.Get(null, imageProviderUrl, CancellationToken.None);
             if (string.IsNullOrEmpty(json))
             {
-                LogManager.LogEvent(LogTypeEnum.error, $"Could not get collection images information from {imageProviderUrl}");
+                LogManager.LogEvent(LogTypeEnum.error, $"Could not get collection image information from {imageProviderUrl}");
                 return;
             }
 
@@ -48,7 +48,7 @@ namespace ACdb.Services
             }
             catch (Exception e)
             {
-                LogManager.LogEvent(LogTypeEnum.error, $"Could not get collection images information from {imageProviderUrl} {e.Message}");
+                LogManager.LogEvent(LogTypeEnum.error, $"Could not get collection image information from {imageProviderUrl} {e.Message}");
                 return;
             }
 

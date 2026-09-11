@@ -2,7 +2,7 @@
 
 # ACdb.tv Jellyfin Plugin
 
-[ACdb.tv](https://acdb.tv) is a webapp and plugin that updates your Jellyfin or Emby server with dynamic, auto-updating collections. ACdb.tv works for both Jellyfin and Emby. This is the official **Jellyfin** plugin.  Please [check out ACdb.tv](https://acdb.tv) for more information.
+[ACdb.tv](https://acdb.tv) is a webapp and plugin that updates your Jellyfin or Emby server with dynamic, auto-updating collections along with Library Images and more. ACdb.tv works for both Jellyfin and Emby. This is the official **Jellyfin** plugin.  Please [check out ACdb.tv](https://acdb.tv) for more information.
 
 ## What about Emby
 For **Emby** installation, please use the Emby plugin catalog. [More information](https://acdb.tv/getting-started).
@@ -63,7 +63,6 @@ For **Emby** installation, please use the Emby plugin catalog. [More information
 ## Community & Support
 
 - For help, questions, or feedback, [ACdb.tv Contact Page](https://acdb.tv/contact)
-- Also see FAQ for Jellyfin issues if using version 10.11.X: https://acdb.tv/wiki/faq/jellyfin-issues 
 - Join us on [Discord](https://discord.gg/9kWgmGwg5e), for all of the above. New collections and posters are announced there as well.
 
 ## License

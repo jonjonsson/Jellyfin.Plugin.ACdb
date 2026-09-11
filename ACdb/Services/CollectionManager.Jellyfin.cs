@@ -34,10 +34,15 @@ internal static class CollectionManager
         await _collectionManager.AddToCollectionAsync(collection.Id, itemIdsGuids);
     }
 
-    public static void RemoveFromCollection(BaseItem item, List<string> itemIds)
+    public static async Task RemoveFromCollectionAsync(BaseItem item, List<string> itemIds)
     {
+        if (item == null || itemIds == null || itemIds.Count == 0)
+        {
+            return;
+        }
+
         Guid[] itemIdsGuids = itemIds.Select(id => Guid.Parse(id)).ToArray(); // Convert List<string> to Guid[] for Jellyfin compatibility
-        _collectionManager.RemoveFromCollectionAsync(item.Id, itemIdsGuids);
+        await _collectionManager.RemoveFromCollectionAsync(item.Id, itemIdsGuids);
     }
 
     public static async Task<BaseItem> CreateCollectionAsync(string name, List<string> itemIdList)
@@ -61,6 +66,9 @@ internal static class CollectionManager
         return item.GetType() == typeof(BoxSet);
     }
 
-
+    internal static IEnumerable<BoxSet> GetCollectionsContainingItem(BaseItem item)
+    {
+        return _collectionManager.GetCollectionsContainingItem(Manager.Utils.GetAdminUser(), item.Id);
+    }
 }
 

@@ -303,7 +303,7 @@ namespace ACdb.Services.Collections
                     List<string> itemsToRemove = itemsInCollectionBefore.Except(itemIDsToAdd).ToList();
                     removeCount = itemsToRemove.Count;
                     await CollectionManager.AddToCollectionAsync(collection, itemsToAddIds); // It's important to add items before removing items. Or else when adding random items, and not the same random items get added the collection cleanup event is triggered
-                    CollectionManager.RemoveFromCollection(collection, itemsToRemove); // Must be after Adding Items.
+                    await CollectionManager.RemoveFromCollectionAsync(collection, itemsToRemove); // Must be after Adding Items.
                     _collectionReport.added_count = itemsToAddIds.Count;
                     _collectionReport.cid = collection.Id.ToString();
                 }

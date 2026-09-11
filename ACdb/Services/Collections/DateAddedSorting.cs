@@ -63,7 +63,7 @@ namespace ACdb.Services.Collections
 
                 try
                 {
-                    List<BoxSet> collectionsWithItem = Manager.Utils.GetItemsAllKnownCollections(item);
+                    var collectionsWithItem = CollectionManager.GetCollectionsContainingItem(item);
                     bool isInOtherDateAddedCollection = false;
 
                     foreach (var collectionInfo in collectionsWithItem)
